@@ -2,14 +2,13 @@ package server
 
 import (
 	"net"
+	"strings"
 	"tcp-multiplier/client"
 	"tcp-multiplier/config"
 )
 
 func ListenAndServe() {
-	tempByteSlice := make([]byte, 1024, 1024)
-	dataChan := make(chan []byte, 100)
-	go client.Send(dataChan)
+	destTcpSvrAddrStrSlice := strings.Split(config.DestTcpSvrAddrs, config.DELIMITER)
 
 	for {
 		localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalTcpSvrAddr)
@@ -21,10 +20,25 @@ func ListenAndServe() {
 
 		srcTcpConn, err := tcpListener.AcceptTCP()
 
+		// single srcTcpConn dimension
+		go func() {
+			senderDataChanSlice := make([]chan []byte, len(destTcpSvrAddrStrSlice), len(destTcpSvrAddrStrSlice))
 
-		_, _ = srcTcpConn.Read(tempByteSlice)
+			for a, destTcpSvrAddrStr := range destTcpSvrAddrStrSlice {
+				dataChan := make(chan []byte, 100)
+				senderDataChanSlice[a] = dataChan
+				go client.Send(dataChan, destTcpSvrAddrStr)
+			}
 
-		dataChan <- tempByteSlice
+			for {
+				tempByteSlice := make([]byte, 1024, 1024)
+				_, _ = srcTcpConn.Read(tempByteSlice)
 
+				// need to dispatch data to each sender's data channel
+				for _, senderDataChan := range senderDataChanSlice {
+					senderDataChan <- tempByteSlice
+				}
+			}
+		}()
 	}
 }
