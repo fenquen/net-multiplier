@@ -13,27 +13,28 @@ func NewSender(srcDataChan chan []byte, destTcpSvrAddrStr string) (*Sender, erro
 	localTcpClientAddr, err := net.ResolveTCPAddr(config.TCP_TYPE,
 		config.LocalTcpClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
 	if nil != err {
-		log.Println("ResolveTCPAddr localTcpClientAddr  err", err)
+		log.Println("ResolveTCPAddr localTcpClientAddr  err", err, destTcpSvrAddrStr)
 		return nil, err
 	}
 
 	// dest addr
 	destTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, destTcpSvrAddrStr)
 	if nil != err {
-		log.Println("ResolveTCPAddr destTcpSvrAddr err", err)
+		log.Println("ResolveTCPAddr destTcpSvrAddr err", err, destTcpSvrAddrStr)
 		return nil, err
 	}
 
 	// tcpConn
 	tcpConn2DestSvr, err := net.DialTCP(config.TCP_TYPE, localTcpClientAddr, destTcpSvrAddr)
 	if nil != err {
-		log.Println("DialTCP tcpConn2DestSvr err", err)
+		log.Println("DialTCP tcpConn2DestSvr err", err, destTcpSvrAddrStr)
 		return nil, err
 	}
 
 	sender := &Sender{}
 	sender.tcpConn2DestSvr = tcpConn2DestSvr
 	sender.srcDataChan = srcDataChan
+	sender.switcher = make(chan bool, 1)
 
 	return sender, nil
 }
@@ -42,6 +43,7 @@ type Sender struct {
 	tcpConn2DestSvr *net.TCPConn
 	srcDataChan     chan []byte
 	switcher        chan bool
+	closed          bool
 }
 
 func (sender *Sender) Start() {
@@ -50,11 +52,9 @@ func (sender *Sender) Start() {
 
 func (sender *Sender) run() {
 	defer func() {
-		log.Println(recover())
+		recover()
 
-		_ = sender.tcpConn2DestSvr.Close()
-		close(sender.srcDataChan)
-		close(sender.switcher)
+		sender.Close();
 	}()
 
 	for {
@@ -69,11 +69,32 @@ func (sender *Sender) run() {
 
 		select {
 		case byteSlice := <-sender.srcDataChan:
-			_, _ = sender.tcpConn2DestSvr.Write(byteSlice)
+			_, err := sender.tcpConn2DestSvr.Write(byteSlice)
+			if nil != err {
+				log.Println("sender.tcpConn2DestSvr.Write err ", err)
+				return
+			}
 		}
 	}
 }
 
 func (sender *Sender) Interrupt() {
 	sender.switcher <- true
+	sender.Close()
+}
+
+func (sender *Sender) Close() {
+	sender.closed = true
+	_ = sender.tcpConn2DestSvr.Close()
+	close(sender.srcDataChan)
+	close(sender.switcher)
+}
+
+func (sender *Sender) IsClosed() bool {
+	return sender.closed
+}
+
+func (sender *Sender) GetSrcDataChan() chan [] byte {
+
+	return sender.srcDataChan
 }

@@ -11,18 +11,28 @@ import (
 
 func ListenAndServe() {
 	destTcpSvrAddrStrSlice := strings.Split(config.DestTcpSvrAddrs, config.DELIMITER)
+	log.Println(destTcpSvrAddrStrSlice)
+	destNum := len(destTcpSvrAddrStrSlice)
+
+	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalTcpSvrAddr)
+	if nil != err {
+		log.Println("localTcpSvrAddr err")
+		panic(err)
+	}
+
+	tcpListener, err := net.ListenTCP(config.TCP_TYPE, localTcpSvrAddr)
+	if nil != err {
+		log.Println("tcpListener err")
+		panic(err)
+	}
 
 	for {
-		localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalTcpSvrAddr)
-
-		// fail to bind local address
+		srcTcpConn, err := tcpListener.AcceptTCP()
 		if nil != err {
 			panic(err)
 		}
 
-		tcpListener, err := net.ListenTCP(config.TCP_TYPE, localTcpSvrAddr)
-
-		srcTcpConn, err := tcpListener.AcceptTCP()
+		log.Println("got srcTcpConn", srcTcpConn)
 
 		// goroutine for single srcTcpConn
 		go func() {
@@ -30,20 +40,17 @@ func ListenAndServe() {
 				_ = srcTcpConn.Close()
 			}()
 
-			destNum := len(destTcpSvrAddrStrSlice)
-
-			srcDataChanSlice := make([]chan []byte, destNum, destNum)
+			//srcDataChanSlice := make([]chan []byte, destNum, destNum)
 			senderSlice := make([]*client.Sender, destNum, destNum)
 
 			for a, destTcpSvrAddrStr := range destTcpSvrAddrStrSlice {
 				srcDataChan := make(chan []byte, 100)
-				srcDataChanSlice[a] = srcDataChan
 
 				sender, err := client.NewSender(srcDataChan, destTcpSvrAddrStr)
 
 				// fail to build sender,due to net err
 				if nil != err {
-					srcDataChanSlice[a] = nil
+					close(srcDataChan)
 					continue
 				}
 
@@ -75,11 +82,12 @@ func ListenAndServe() {
 				tempByteSlice = tempByteSlice[0:readCount]
 
 				// need to dispatch data to each sender's data channel
-				for _, srcDataChan := range srcDataChanSlice {
-					if nil == srcDataChan {
+				for _, sender := range senderSlice {
+					if nil == senderSlice || sender.IsClosed() {
 						continue
 					}
-					srcDataChan <- tempByteSlice
+
+					sender.GetSrcDataChan() <- tempByteSlice
 				}
 			}
 		}()
