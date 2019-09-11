@@ -10,8 +10,8 @@ var (
 		"0.0.0.0:9070",
 		"the address where the server listens"))
 
-	DestTcpSvrAddrs = *(flag.String("destTcpSvrAddr",
-		"",
+	DestTcpSvrAddrs = *(flag.String("destTcpSvrAddrs",
+		"192.168.100.100:8889,192.168.100.100:8888",
 		"the destinations that the data is relayed to,it is a comma-delimited string,e.g. 192.168.1.6:9060,192.168.1.60:9060"))
 
 	LocalTcpClientHost = *(flag.String("localTcpClientHost",
