@@ -9,13 +9,20 @@ import (
 	"tcp-multiplier/config"
 )
 
-func main() {
-	fmt.Println(config.LocalTcpSvrAddr)
-	fmt.Println(config.DestTcpSvrAddrs)
-
+func main0() {
 	if "" == strings.Trim(config.DestTcpSvrAddrs, " ") {
 		log.Println("you actually did not specify a valid \"DestTcpSvrAddrs\",it is virtually empty")
 		flag.Usage()
 		os.Exit(0)
 	}
+}
+
+func main() {
+
+	defer func() {
+		//recover()
+		fmt.Println("defer")
+	}()
+
+	panic("a")
 }

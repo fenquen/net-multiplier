@@ -20,23 +20,29 @@ func ListenAndServe() {
 
 		srcTcpConn, err := tcpListener.AcceptTCP()
 
-		// single srcTcpConn dimension
+		// goroutine for single srcTcpConn
 		go func() {
-			senderDataChanSlice := make([]chan []byte, len(destTcpSvrAddrStrSlice), len(destTcpSvrAddrStrSlice))
+			srcDataChanSlice := make([]chan []byte, len(destTcpSvrAddrStrSlice), len(destTcpSvrAddrStrSlice))
 
 			for a, destTcpSvrAddrStr := range destTcpSvrAddrStrSlice {
-				dataChan := make(chan []byte, 100)
-				senderDataChanSlice[a] = dataChan
-				go client.Send(dataChan, destTcpSvrAddrStr)
+				srcDataChan := make(chan []byte, 100)
+				srcDataChanSlice[a] = srcDataChan
+
+				sender, err := client.NewSender(srcDataChan, destTcpSvrAddrStr)
+				if nil != err {
+					continue
+				}
+				sender.Start()
 			}
 
 			for {
 				tempByteSlice := make([]byte, 1024, 1024)
-				_, _ = srcTcpConn.Read(tempByteSlice)
+				readCount, _ := srcTcpConn.Read(tempByteSlice)
+				tempByteSlice = tempByteSlice[0:readCount]
 
 				// need to dispatch data to each sender's data channel
-				for _, senderDataChan := range senderDataChanSlice {
-					senderDataChan <- tempByteSlice
+				for _, srcDataChan := range srcDataChanSlice {
+					srcDataChan <- tempByteSlice
 				}
 			}
 		}()
