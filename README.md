@@ -1,6 +1,9 @@
 # tcp-multiplier
 a simple tcp multiplier by golang
 
+### Theory
+![Theory](./assets/tcp-multiplier.png)
+
 ### Usage
 
 ``````
