@@ -8,41 +8,26 @@ import (
 	"tcp-multiplier/utils"
 )
 
-func Send(senderDataChan chan []byte, destTcpSvrAddrStr string) {
-	localTcpClientAddr, _ := net.ResolveTCPAddr(config.TCP_TYPE,
-		config.LocalTcpClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
-	destTcpSvrAddr, _ := net.ResolveTCPAddr(config.TCP_TYPE, destTcpSvrAddrStr)
-
-	tcpConn2DestSvr, _ := net.DialTCP(config.TCP_TYPE, localTcpClientAddr, destTcpSvrAddr)
-	defer func() {
-		log.Println(recover())
-		_ = tcpConn2DestSvr.Close()
-	}()
-
-	for {
-		select {
-		case byteSlice := <-senderDataChan:
-			_, _ = tcpConn2DestSvr.Write(byteSlice)
-		}
-	}
-}
-
-type Sender struct {
-	tcpConn2DestSvr *net.TCPConn
-	srcDataChan     chan []byte
-	switcher        chan bool
-}
-
 func NewSender(srcDataChan chan []byte, destTcpSvrAddrStr string) (*Sender, error) {
+	// local addr
 	localTcpClientAddr, err := net.ResolveTCPAddr(config.TCP_TYPE,
 		config.LocalTcpClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
-
-	destTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, destTcpSvrAddrStr)
-
-	tcpConn2DestSvr, err := net.DialTCP(config.TCP_TYPE, localTcpClientAddr, destTcpSvrAddr)
-
 	if nil != err {
-		log.Println("NewSender err", err)
+		log.Println("ResolveTCPAddr localTcpClientAddr  err", err)
+		return nil, err
+	}
+
+	// dest addr
+	destTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, destTcpSvrAddrStr)
+	if nil != err {
+		log.Println("ResolveTCPAddr destTcpSvrAddr err", err)
+		return nil, err
+	}
+
+	// tcpConn
+	tcpConn2DestSvr, err := net.DialTCP(config.TCP_TYPE, localTcpClientAddr, destTcpSvrAddr)
+	if nil != err {
+		log.Println("DialTCP tcpConn2DestSvr err", err)
 		return nil, err
 	}
 
@@ -53,6 +38,12 @@ func NewSender(srcDataChan chan []byte, destTcpSvrAddrStr string) (*Sender, erro
 	return sender, nil
 }
 
+type Sender struct {
+	tcpConn2DestSvr *net.TCPConn
+	srcDataChan     chan []byte
+	switcher        chan bool
+}
+
 func (sender *Sender) Start() {
 	go sender.run()
 }
@@ -60,8 +51,10 @@ func (sender *Sender) Start() {
 func (sender *Sender) run() {
 	defer func() {
 		log.Println(recover())
+
 		_ = sender.tcpConn2DestSvr.Close()
 		close(sender.srcDataChan)
+		close(sender.switcher)
 	}()
 
 	for {

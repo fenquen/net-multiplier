@@ -26,6 +26,10 @@ func ListenAndServe() {
 
 		// goroutine for single srcTcpConn
 		go func() {
+			defer func() {
+				_ = srcTcpConn.Close()
+			}()
+
 			destNum := len(destTcpSvrAddrStrSlice)
 
 			srcDataChanSlice := make([]chan []byte, destNum, destNum)
@@ -48,6 +52,7 @@ func ListenAndServe() {
 				sender.Start()
 			}
 
+			// loop
 			for {
 				tempByteSlice := make([]byte, 1024, 1024)
 
@@ -63,6 +68,8 @@ func ListenAndServe() {
 							sender.Interrupt()
 						}
 					}
+
+					return
 				}
 
 				tempByteSlice = tempByteSlice[0:readCount]
