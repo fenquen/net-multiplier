@@ -1,5 +1,5 @@
 # tcp-multiplier
-a simple tcp multiplier by golang
+a simple tcp multiplier written by golang .It duplicates a single tcp input stream into multi output streams at the same time. 
 
 ### Theory
 ![Theory](./assets/tcp-multiplier.png)
