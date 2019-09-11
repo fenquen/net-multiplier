@@ -12,7 +12,7 @@ func ListenAndServe() {
 	go client.Send(dataChan)
 
 	for {
-		localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, ":9070")
+		localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalTcpSvrAddr)
 		if nil != err {
 			panic(err)
 		}

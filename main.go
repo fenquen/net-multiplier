@@ -1,7 +1,11 @@
 package main
 
-import "tcp-multiplier/server"
+import (
+	"fmt"
+	"tcp-multiplier/config"
+)
 
 func main() {
-	server.ListenAndServe()
+	fmt.Println(config.LocalTcpSvrAddr)
+	fmt.Println(config.DestTcpSvrAddr)
 }
