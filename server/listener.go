@@ -22,14 +22,15 @@ func ListenAndServe() {
 
 	tcpListener, err := net.ListenTCP(config.TCP_TYPE, localTcpSvrAddr)
 	if nil != err {
-		log.Println("tcpListener err")
+		log.Println("tcpListener err", err)
 		panic(err)
 	}
 
 	for {
 		srcTcpConn, err := tcpListener.AcceptTCP()
 		if nil != err {
-			panic(err)
+			log.Println("tcpListener.AcceptTCP() err", err)
+			continue
 		}
 
 		log.Println("got srcTcpConn", srcTcpConn)
