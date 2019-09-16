@@ -47,10 +47,10 @@ func GetCyclic(target *int32, delta int32, max int32, base int32) int32 {
 	for {
 		result = *target
 		if max > result {
-			if !atomic.CompareAndSwapInt32(target, result, result+delta) {
-				continue
+			if atomic.CompareAndSwapInt32(target, result, result+delta) {
+				return result
 			}
-			return result
+			continue
 		}
 
 		if atomic.CompareAndSwapInt32(target, result, base+delta) {
