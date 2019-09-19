@@ -2,15 +2,12 @@ package config
 
 import (
 	"flag"
-	"go.uber.org/zap"
 	"strings"
 )
 
 const TCP_MODE = "tcp"
 const UDP_MODE = "udp"
 const DELIMITER = ","
-
-var LOGGER *zap.Logger
 
 var (
 	LocalSvrAddr = *(flag.String("localTcpSvrAddr",
@@ -29,7 +26,8 @@ var (
 	Mode = strings.ToLower(*(flag.String("mode", "udp", "tcp or udp")))
 )
 
+var APP_NAME = "net-multiplier"
+
 func init() {
 	flag.Parse()
-	LOGGER, _ = zap.NewDevelopment()
 }

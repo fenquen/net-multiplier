@@ -1,11 +1,12 @@
 package client
 
 import (
-	"log"
+	"go.uber.org/zap"
 	"net"
 	"strconv"
 	"tcp-multiplier/config"
 	"tcp-multiplier/utils"
+	"tcp-multiplier/zaplog"
 )
 
 type Sender interface {
@@ -33,21 +34,21 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 		localClientAddr, err := net.ResolveTCPAddr(mode,
 			config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
 		if nil != err {
-			log.Println("ResolveTCPAddr localClientAddr  err", err, destTcpSvrAddrStr)
+			zaplog.LOGGER.Error("ResolveTCPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHost", config.LocalClientHost))
 			return nil, err
 		}
 
 		// destSvrAddr
 		destSvrAddr, err := net.ResolveTCPAddr(mode, destTcpSvrAddrStr)
 		if nil != err {
-			log.Println("ResolveTCPAddr destSvrAddr err", err, destTcpSvrAddrStr)
+			zaplog.LOGGER.Error("ResolveTCPAddr destSvrAddr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
 		}
 
 		// conn2DestSvr
 		conn2DestSvr, err = net.DialTCP(mode, localClientAddr, destSvrAddr)
 		if nil != err {
-			log.Println("DialTCP conn2DestSvr err", err, destTcpSvrAddrStr)
+			zaplog.LOGGER.Error("DialTCP conn2DestSvr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
 		}
 
@@ -57,21 +58,21 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 		localClientAddr, err := net.ResolveUDPAddr(mode,
 			config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
 		if nil != err {
-			log.Println("ResolveUDPAddr localClientAddr  err", err, destTcpSvrAddrStr)
+			zaplog.LOGGER.Error("ResolveUDPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHost", "LocalClientHost"))
 			return nil, err
 		}
 
 		// destSvrAddr
 		destSvrAddr, err := net.ResolveUDPAddr(mode, destTcpSvrAddrStr)
 		if nil != err {
-			log.Println("ResolveUDPAddr destSvrAddr err", err, destTcpSvrAddrStr)
+			zaplog.LOGGER.Error("ResolveUDPAddr destSvrAddr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
 		}
 
 		// conn2DestSvr
 		conn2DestSvr, err = net.DialUDP(mode, localClientAddr, destSvrAddr)
 		if nil != err {
-			log.Println("DialUDP conn2DestSvr err", err, destTcpSvrAddrStr)
+			zaplog.LOGGER.Error("DialUDP conn2DestSvr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
 		}
 
@@ -118,7 +119,7 @@ func (senderBase *SenderBase) Run() {
 		case byteSlice := <-senderBase.srcDataChan:
 			_, err := senderBase.conn2DestSvr.Write(byteSlice)
 			if nil != err {
-				log.Println("senderBase.conn2DestSvr.Write err ", err)
+				zaplog.LOGGER.Info("senderBase.conn2DestSvr.Write", zap.Any("err", err))
 				return
 			}
 		}
