@@ -124,11 +124,14 @@ func processConn(srcConn net.Conn) {
 
 			// need to dispatch data to each sender's data channel
 			for _, sender := range senderSlice {
-				if nil == senderSlice || sender.IsClosed() {
+				if sender.IsClosed() {
 					continue
 				}
 
-				sender.GetSrcDataChan() <- data
+				go func(sender client.Sender) {
+					sender.GetSrcDataChan() <- data
+				}(sender)
+
 			}
 		}(senderSlice, tempByteSlice)
 	}
