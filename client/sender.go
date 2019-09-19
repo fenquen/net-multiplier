@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/hex"
 	"go.uber.org/zap"
 	"net"
 	"strconv"
@@ -122,6 +123,7 @@ func (senderBase *SenderBase) Run() {
 				zaplog.LOGGER.Info("senderBase.conn2DestSvr.Write", zap.Any("err", err))
 				return
 			}
+			zaplog.LOGGER.Info("successfully write data to dest " + hex.EncodeToString(byteSlice))
 		}
 	}
 }

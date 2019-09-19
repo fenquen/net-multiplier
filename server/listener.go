@@ -113,7 +113,7 @@ func processConn(srcConn net.Conn) {
 
 		tempByteSlice = tempByteSlice[0:readCount]
 
-		zaplog.LOGGER.Info("receive src data from " + srcConn.RemoteAddr().String())
+		//zaplog.LOGGER.Info("receive src data from " + srcConn.RemoteAddr().String())
 		zaplog.LOGGER.Info(hex.EncodeToString(tempByteSlice))
 
 		// per dest/sender a goroutine
