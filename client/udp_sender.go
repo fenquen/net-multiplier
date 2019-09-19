@@ -1,5 +1,5 @@
 package client
 
-type TcpSender struct {
+type UdpSender struct {
 	SenderBase
 }

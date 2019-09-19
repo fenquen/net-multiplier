@@ -11,11 +11,11 @@ import (
 )
 
 func ListenAndServe() {
-	destTcpSvrAddrStrSlice := strings.Split(config.DestTcpSvrAddrs, config.DELIMITER)
+	destTcpSvrAddrStrSlice := strings.Split(config.DestSvrAddrs, config.DELIMITER)
 	log.Println("destTcpSvrAddr ", destTcpSvrAddrStrSlice)
 	destNum := len(destTcpSvrAddrStrSlice)
 
-	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalTcpSvrAddr)
+	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalSvrAddr)
 	if nil != err {
 		log.Println("localTcpSvrAddr err")
 		panic(err)
@@ -42,14 +42,14 @@ func ListenAndServe() {
 				_ = srcTcpConn.Close()
 			}()
 
-			var senderSlice []*client.TcpSender;
+			var senderSlice []client.Sender
 			if destNum > 0 {
 				//srcDataChanSlice := make([]chan []byte, destNum, destNum)
-				senderSlice = make([]*client.TcpSender, destNum, destNum)
+				senderSlice = make([]client.Sender, destNum, destNum)
 
 				for a, destTcpSvrAddrStr := range destTcpSvrAddrStrSlice {
 
-					sender, err := client.NewTcpSender(destTcpSvrAddrStr)
+					sender, err := client.NewSender(destTcpSvrAddrStr, config.Mode)
 
 					// fail to build sender,due to net err
 					if nil != err {

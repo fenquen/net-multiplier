@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"strings"
 	"tcp-multiplier/config"
 	"tcp-multiplier/server"
@@ -21,10 +22,19 @@ func main() {
 	//fmt.Println(<-a)
 	//fmt.Println(<-a)
 
-	if "" == strings.Trim(config.DestTcpSvrAddrs, " ") {
-		log.Println("you actually did not specify a valid \"DestTcpSvrAddrs\",it is virtually empty")
+	if "" == strings.Trim(config.DestSvrAddrs, " ") {
+		log.Println("you actually did not specify a valid \"DestSvrAddrs\",it is virtually empty")
 		//flag.Usage()
 		//os.Exit(0)
+	}
+
+	// verify mode
+	switch config.Mode {
+	case config.TCP_TYPE:
+	case config.UDP_TYPE:
+	default:
+		log.Println("mode must be tcp or udp")
+		os.Exit(0)
 	}
 
 	server.ListenAndServe()
