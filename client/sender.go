@@ -57,21 +57,21 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 		localClientAddr, err := net.ResolveUDPAddr(mode,
 			config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
 		if nil != err {
-			log.Println("ResolveTCPAddr localClientAddr  err", err, destTcpSvrAddrStr)
+			log.Println("ResolveUDPAddr localClientAddr  err", err, destTcpSvrAddrStr)
 			return nil, err
 		}
 
 		// destSvrAddr
 		destSvrAddr, err := net.ResolveUDPAddr(mode, destTcpSvrAddrStr)
 		if nil != err {
-			log.Println("ResolveTCPAddr destSvrAddr err", err, destTcpSvrAddrStr)
+			log.Println("ResolveUDPAddr destSvrAddr err", err, destTcpSvrAddrStr)
 			return nil, err
 		}
 
 		// conn2DestSvr
 		conn2DestSvr, err = net.DialUDP(mode, localClientAddr, destSvrAddr)
 		if nil != err {
-			log.Println("DialTCP conn2DestSvr err", err, destTcpSvrAddrStr)
+			log.Println("DialUDP conn2DestSvr err", err, destTcpSvrAddrStr)
 			return nil, err
 		}
 

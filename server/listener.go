@@ -10,18 +10,19 @@ import (
 	"tcp-multiplier/config"
 )
 
-func ListenAndServe() {
-	destTcpSvrAddrStrSlice := strings.Split(config.DestSvrAddrs, config.DELIMITER)
-	log.Println("destTcpSvrAddr ", destTcpSvrAddrStrSlice)
-	destNum := len(destTcpSvrAddrStrSlice)
+var destSvrAddrStrSlice = strings.Split(config.DestSvrAddrs, config.DELIMITER)
 
-	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalSvrAddr)
+func ListenAndServeTcp() {
+	log.Println("destSvrAddr ", destSvrAddrStrSlice)
+
+	// mode tcp
+	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_MODE, config.LocalSvrAddr)
 	if nil != err {
 		log.Println("localTcpSvrAddr err")
 		panic(err)
 	}
 
-	tcpListener, err := net.ListenTCP(config.TCP_TYPE, localTcpSvrAddr)
+	tcpListener, err := net.ListenTCP(config.TCP_MODE, localTcpSvrAddr)
 	if nil != err {
 		log.Println("tcpListener err", err)
 		panic(err)
@@ -37,69 +38,96 @@ func ListenAndServe() {
 		log.Println("got srcTcpConn", srcTcpConn)
 
 		// goroutine for single srcTcpConn
-		go func() {
-			defer func() {
-				_ = srcTcpConn.Close()
-			}()
+		go processConn(srcTcpConn)
+	}
 
-			var senderSlice []client.Sender
-			if destNum > 0 {
-				//srcDataChanSlice := make([]chan []byte, destNum, destNum)
-				senderSlice = make([]client.Sender, destNum, destNum)
+}
 
-				for a, destTcpSvrAddrStr := range destTcpSvrAddrStrSlice {
+func ServeUdp() {
+	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, config.LocalSvrAddr)
+	if nil != err {
+		log.Println("localUdpSvrAddr err")
+		panic(err)
+	}
 
-					sender, err := client.NewSender(destTcpSvrAddrStr, config.Mode)
+	for {
+		udpConn, err := net.ListenUDP(config.UDP_MODE, localUdpSvrAddr)
+		if nil != err {
+			log.Println("ServeUdp net.ListenUDP err ", err)
+			panic(err)
+		}
 
-					// fail to build sender,due to net err
-					if nil != err {
-						continue
+		processConn(udpConn)
+	}
+
+}
+
+func processConn(srcConn net.Conn) {
+	defer func() {
+		_ = srcConn.Close()
+	}()
+
+	// senderSlice
+	var senderSlice []client.Sender
+	if nil != destSvrAddrStrSlice && len(destSvrAddrStrSlice) > 0 {
+		destSvrNum := len(destSvrAddrStrSlice)
+		senderSlice = make([]client.Sender, destSvrNum, destSvrNum)
+
+		for a, destTcpSvrAddrStr := range destSvrAddrStrSlice {
+			sender, err := client.NewSender(destTcpSvrAddrStr, config.Mode)
+
+			// fail to build sender,due to net err
+			if nil != err {
+				continue
+			}
+
+			senderSlice[a] = sender
+
+			sender.Start()
+		}
+	}
+
+	// loop
+	for {
+		tempByteSlice := make([]byte, 1024, 1024)
+
+		readCount, err := srcConn.Read(tempByteSlice)
+
+		// meanings srcTcpConn is closed by client
+		if 0 >= readCount && err != io.EOF {
+			log.Println("srcConn.Read(tempByteSlice), 0 >= readCount && err != io.EOF")
+
+			if nil != senderSlice {
+				// interrupt all sender serving this srcTcpConn
+				for _, sender := range senderSlice {
+					if nil != sender {
+						sender.Interrupt()
 					}
-
-					senderSlice[a] = sender
-
-					sender.Start()
 				}
 			}
 
-			// loop
-			for {
-				tempByteSlice := make([]byte, 1024, 1024)
+			return
+		}
 
-				readCount, err := srcTcpConn.Read(tempByteSlice)
+		tempByteSlice = tempByteSlice[0:readCount]
 
-				// meanings srcTcpConn is closed by client
-				if 0 >= readCount && err != io.EOF {
-					log.Println("srcTcpConn.Read EOF,srcTcpConn is closed by client")
+		log.Println("receive src data from " + srcConn.RemoteAddr().String())
+		log.Println(hex.EncodeToString(tempByteSlice), "\n")
 
-					if nil != senderSlice {
-						// interrupt all sender serving this srcTcpConn
-						for _, sender := range senderSlice {
-							if nil != sender {
-								sender.Interrupt()
-							}
-						}
-					}
-
-					return
-				}
-
-				tempByteSlice = tempByteSlice[0:readCount]
-
-				log.Println("receive src data from " + srcTcpConn.RemoteAddr().String())
-				log.Println(hex.EncodeToString(tempByteSlice), "\n")
-
-				if nil != senderSlice {
-					// need to dispatch data to each sender's data channel
-					for _, sender := range senderSlice {
-						if nil == senderSlice || sender.IsClosed() {
-							continue
-						}
-
-						sender.GetSrcDataChan() <- tempByteSlice
-					}
-				}
+		// per dest/sender a goroutine
+		go func(senderSlice []client.Sender, data [] byte) {
+			if nil == senderSlice {
+				return
 			}
-		}()
+
+			// need to dispatch data to each sender's data channel
+			for _, sender := range senderSlice {
+				if nil == senderSlice || sender.IsClosed() {
+					continue
+				}
+
+				sender.GetSrcDataChan() <- data
+			}
+		}(senderSlice, tempByteSlice)
 	}
 }
