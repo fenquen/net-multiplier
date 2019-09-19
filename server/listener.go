@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/hex"
 	"io"
 	"log"
 	"net"
@@ -11,7 +12,7 @@ import (
 
 func ListenAndServe() {
 	destTcpSvrAddrStrSlice := strings.Split(config.DestTcpSvrAddrs, config.DELIMITER)
-	log.Println(destTcpSvrAddrStrSlice)
+	log.Println("destTcpSvrAddr ", destTcpSvrAddrStrSlice)
 	destNum := len(destTcpSvrAddrStrSlice)
 
 	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_TYPE, config.LocalTcpSvrAddr)
@@ -41,23 +42,24 @@ func ListenAndServe() {
 				_ = srcTcpConn.Close()
 			}()
 
-			//srcDataChanSlice := make([]chan []byte, destNum, destNum)
-			senderSlice := make([]*client.Sender, destNum, destNum)
+			var senderSlice []*client.TcpSender;
+			if destNum > 0 {
+				//srcDataChanSlice := make([]chan []byte, destNum, destNum)
+				senderSlice = make([]*client.TcpSender, destNum, destNum)
 
-			for a, destTcpSvrAddrStr := range destTcpSvrAddrStrSlice {
-				srcDataChan := make(chan []byte, 100)
+				for a, destTcpSvrAddrStr := range destTcpSvrAddrStrSlice {
 
-				sender, err := client.NewSender(srcDataChan, destTcpSvrAddrStr)
+					sender, err := client.NewTcpSender(destTcpSvrAddrStr)
 
-				// fail to build sender,due to net err
-				if nil != err {
-					close(srcDataChan)
-					continue
+					// fail to build sender,due to net err
+					if nil != err {
+						continue
+					}
+
+					senderSlice[a] = sender
+
+					sender.Start()
 				}
-
-				senderSlice[a] = sender
-
-				sender.Start()
 			}
 
 			// loop
@@ -67,13 +69,15 @@ func ListenAndServe() {
 				readCount, err := srcTcpConn.Read(tempByteSlice)
 
 				// meanings srcTcpConn is closed by client
-				if err == io.EOF {
+				if 0 >= readCount && err != io.EOF {
 					log.Println("srcTcpConn.Read EOF,srcTcpConn is closed by client")
 
-					// interrupt all sender serving this srcTcpConn
-					for _, sender := range senderSlice {
-						if nil != sender {
-							sender.Interrupt()
+					if nil != senderSlice {
+						// interrupt all sender serving this srcTcpConn
+						for _, sender := range senderSlice {
+							if nil != sender {
+								sender.Interrupt()
+							}
 						}
 					}
 
@@ -82,13 +86,18 @@ func ListenAndServe() {
 
 				tempByteSlice = tempByteSlice[0:readCount]
 
-				// need to dispatch data to each sender's data channel
-				for _, sender := range senderSlice {
-					if nil == senderSlice || sender.IsClosed() {
-						continue
-					}
+				log.Println("receive src data from " + srcTcpConn.RemoteAddr().String())
+				log.Println(hex.EncodeToString(tempByteSlice), "\n")
 
-					sender.GetSrcDataChan() <- tempByteSlice
+				if nil != senderSlice {
+					// need to dispatch data to each sender's data channel
+					for _, sender := range senderSlice {
+						if nil == senderSlice || sender.IsClosed() {
+							continue
+						}
+
+						sender.GetSrcDataChan() <- tempByteSlice
+					}
 				}
 			}
 		}()
