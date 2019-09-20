@@ -30,7 +30,7 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 	var result Sender
 
 	switch mode {
-	case "tcp":
+	case config.TCP_MODE:
 		// localClientAddr
 		localClientAddr, err := net.ResolveTCPAddr(mode,
 			config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
@@ -54,7 +54,7 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 		}
 
 		result = &TcpSender{}
-	case "udp":
+	case config.UDP_MODE:
 		// localClientAddr
 		localClientAddr, err := net.ResolveUDPAddr(mode,
 			config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))

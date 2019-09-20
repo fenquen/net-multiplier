@@ -2,7 +2,7 @@
 a simple tcp/udp multiplier written by golang .It duplicates a single tcp/udp input into multi outputs at the same time. 
 
 ### Theory
-![Theory](./assets/tcp-multiplier.png)
+![Theory](./assets/net-multiplier.png)
 
 ### Usage
 
