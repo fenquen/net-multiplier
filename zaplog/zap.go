@@ -42,3 +42,11 @@ func InitZapLog() {
 func init() {
 	InitZapLog()
 }
+
+func Info(msg string, fields ...zap.Field) {
+	LOGGER.Info(msg, fields...)
+}
+
+func Error(msg string, fields ...zap.Field) {
+	LOGGER.Error(msg, fields...)
+}

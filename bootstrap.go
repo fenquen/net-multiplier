@@ -14,17 +14,17 @@ func main() {
 		zaplog.LOGGER.Sync()
 		err := recover()
 		if nil != err {
-			zaplog.LOGGER.Error(fmt.Sprint(err))
+			zaplog.Error(fmt.Sprint(err))
 		}
 	}()
 
 	if "" == strings.Trim(config.DestSvrAddrs, " ") {
-		zaplog.LOGGER.Info("you actually did not specify a valid \"DestSvrAddrs\",it is virtually empty")
+		zaplog.Info("you actually did not specify a valid \"DestSvrAddrs\",it is virtually empty")
 		//flag.Usage()
 		//os.Exit(0)
 	}
 
-	zaplog.LOGGER.Info("mode " + config.Mode)
+	zaplog.Info("mode " + config.Mode)
 
 	// verify mode
 	switch config.Mode {
@@ -33,7 +33,7 @@ func main() {
 	case config.UDP_MODE:
 		server.ServeUdp()
 	default:
-		zaplog.LOGGER.Info("mode must be tcp or udp")
+		zaplog.Info("mode must be tcp or udp")
 		os.Exit(0)
 	}
 
