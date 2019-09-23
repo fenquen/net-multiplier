@@ -24,6 +24,8 @@ var (
 		"designate the host to which the sender is bind to"))
 
 	Mode = strings.ToLower(*(flag.String("mode", "udp", "tcp or udp")))
+
+	UdpPacketSize = *(flag.Int("udpPacketSize",2048,"the receive size for a single udp datagram packet"))
 )
 
 var APP_NAME = "net-multiplier"
