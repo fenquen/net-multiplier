@@ -25,7 +25,7 @@ var (
 
 	Mode = strings.ToLower(*(flag.String("mode", "udp", "tcp or udp")))
 
-	UdpPacketSize = *(flag.Int("udpPacketSize",2048,"the receive size for a single udp datagram packet"))
+	TempByteSliceLen = *(flag.Int("tempByteSliceLen",2048,"the temp byte slice size for tcp/udp read"))
 )
 
 var APP_NAME = "net-multiplier"

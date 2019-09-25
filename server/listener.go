@@ -91,7 +91,7 @@ func processConn(srcConn net.Conn) {
 
 	// loop
 	for {
-		tempByteSlice := make([]byte, 1024, 1024)
+		tempByteSlice := make([]byte, config.TempByteSliceLen, config.TempByteSliceLen)
 
 		readCount, err := srcConn.Read(tempByteSlice)
 
