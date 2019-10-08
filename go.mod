@@ -1,4 +1,4 @@
-module tcp-multiplier
+module net-multiplier
 
 go 1.12
 

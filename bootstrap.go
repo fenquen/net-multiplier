@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"net-multiplier/config"
+	"net-multiplier/server"
+	"net-multiplier/zaplog"
 	"os"
 	"strings"
-	"tcp-multiplier/config"
-	"tcp-multiplier/server"
-	"tcp-multiplier/zaplog"
 )
 
 func main() {

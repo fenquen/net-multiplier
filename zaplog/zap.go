@@ -3,7 +3,7 @@ package zaplog
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"tcp-multiplier/config"
+	"net-multiplier/config"
 )
 
 var LOGGER *zap.Logger

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"net"
+	"net-multiplier/client"
+	"net-multiplier/config"
+	"net-multiplier/zaplog"
 	"strings"
-	"tcp-multiplier/client"
-	"tcp-multiplier/config"
-	"tcp-multiplier/zaplog"
 )
 
 var destSvrAddrStrSlice = strings.Split(config.DestSvrAddrs, config.DELIMITER)
@@ -93,9 +93,9 @@ func processConn(srcConn net.Conn) {
 		tempByteSlice := make([]byte, config.TempByteSliceLen, config.TempByteSliceLen)
 
 		//_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
-		zaplog.Info("before srcConn.Read(tempByteSlice)")
+		zaplog.LOGGER.Info("before srcConn.Read(tempByteSlice)")
 		readCount, err := srcConn.Read(tempByteSlice)
-		zaplog.Info("readCount, err := srcConn.Read(tempByteSlice)", zap.Any("readCount", readCount), zap.Any("err", err))
+		zaplog.LOGGER.Info("readCount, err := srcConn.Read(tempByteSlice)", zap.Any("readCount", readCount), zap.Any("err", err))
 
 		// meanings srcTcpConn is closed by client
 		if 0 >= readCount && err != nil /*io.EOF*/ {

@@ -6,9 +6,9 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"strconv"
-	"tcp-multiplier/config"
-	"tcp-multiplier/utils"
-	"tcp-multiplier/zaplog"
+	"net-multiplier/config"
+	"net-multiplier/utils"
+	"net-multiplier/zaplog"
 )
 
 type Sender interface {
