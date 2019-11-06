@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net-multiplier/config"
 	"net-multiplier/server"
@@ -18,16 +19,18 @@ func main() {
 		}
 	}()
 
-	if "" == strings.Trim(config.DestSvrAddrs, " ") {
+	flag.Usage()
+
+	if "" == strings.Trim(*config.DestSvrAddrs, " ") {
 		zaplog.LOGGER.Info("you actually did not specify a valid \"DestSvrAddrs\",it is virtually empty")
 		//flag.Usage()
 		//os.Exit(0)
 	}
 
-	zaplog.LOGGER.Info("mode " + config.Mode)
+	zaplog.LOGGER.Info("mode " + *config.Mode)
 
 	// verify mode
-	switch config.Mode {
+	switch *config.Mode {
 	case config.TCP_MODE:
 		server.ListenAndServeTcp()
 	case config.UDP_MODE:

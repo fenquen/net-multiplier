@@ -34,9 +34,9 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 	case config.TCP_MODE:
 		// localClientAddr
 		localClientAddr, err := net.ResolveTCPAddr(mode,
-			config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
+			*config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
 		if nil != err {
-			zaplog.LOGGER.Error("ResolveTCPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHost", config.LocalClientHost))
+			zaplog.LOGGER.Error("ResolveTCPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHost", *config.LocalClientHost))
 			return nil, err
 		}
 
@@ -58,7 +58,7 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 	case config.UDP_MODE:
 		// localClientAddr
 		localClientAddr, err := net.ResolveUDPAddr(mode,
-			config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
+			*config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
 		if nil != err {
 			zaplog.LOGGER.Error("ResolveUDPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHost", "LocalClientHost"))
 			return nil, err

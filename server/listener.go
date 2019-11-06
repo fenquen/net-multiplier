@@ -11,13 +11,13 @@ import (
 	"strings"
 )
 
-var destSvrAddrStrSlice = strings.Split(config.DestSvrAddrs, config.DELIMITER)
+var destSvrAddrStrSlice = strings.Split(*config.DestSvrAddrs, config.DELIMITER)
 
 func ListenAndServeTcp() {
 	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destSvrAddrStrSlice))
 
 	// mode tcp
-	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_MODE, config.LocalSvrAddr)
+	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_MODE, *config.LocalSvrAddr)
 	if nil != err {
 		zaplog.LOGGER.Info("localTcpSvrAddr err")
 		panic(err)
@@ -47,7 +47,7 @@ func ListenAndServeTcp() {
 func ServeUdp() {
 	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destSvrAddrStrSlice))
 
-	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, config.LocalSvrAddr)
+	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, *config.LocalSvrAddr)
 	if nil != err {
 		zaplog.LOGGER.Info("localUdpSvrAddr err")
 		panic(err)
@@ -75,7 +75,7 @@ func processConn(srcConn net.Conn) {
 		senderSlice = make([]client.Sender, destSvrNum, destSvrNum)
 
 		for a, destTcpSvrAddrStr := range destSvrAddrStrSlice {
-			sender, err := client.NewSender(destTcpSvrAddrStr, config.Mode)
+			sender, err := client.NewSender(destTcpSvrAddrStr, *config.Mode)
 
 			// fail to build sender,due to net err
 			if nil != err {
