@@ -13,7 +13,7 @@ type SenderBase struct {
 	conn2DestSvr net.Conn
 	srcDataChan  chan []byte
 	switcher     chan bool
-	closed       bool
+	interrupted  bool
 	localAddr    net.Addr
 	remoteAddr   net.Addr
 }
@@ -67,18 +67,18 @@ func (senderBase *SenderBase) Run() {
 
 func (senderBase *SenderBase) Interrupt() {
 	senderBase.switcher <- true
-	//senderBase.Close()
+	senderBase.interrupted = true
 }
 
 func (senderBase *SenderBase) Close() {
-	senderBase.closed = true
+
 	_ = senderBase.conn2DestSvr.Close()
 	close(senderBase.srcDataChan)
 	close(senderBase.switcher)
 }
 
-func (senderBase *SenderBase) IsClosed() bool {
-	return senderBase.closed
+func (senderBase *SenderBase) Interrupted() bool {
+	return senderBase.interrupted
 }
 
 func (senderBase *SenderBase) GetSrcDataChan() chan [] byte {

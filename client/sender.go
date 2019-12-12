@@ -15,7 +15,7 @@ type Sender interface {
 
 	Interrupt()
 	Close()
-	IsClosed() bool
+	Interrupted() bool
 
 	GetSrcDataChan() chan [] byte
 

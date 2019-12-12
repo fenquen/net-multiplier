@@ -12,7 +12,7 @@ import (
 )
 
 var destSvrAddrStrSlice = strings.Split(*config.DestSvrAddrs, config.DELIMITER)
-var senderSlice = buildSenderSlice()
+var senderSlice = buildAndBootSenderSlice()
 
 func ListenAndServeTcp() {
 	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destSvrAddrStrSlice))
@@ -65,7 +65,7 @@ func ServeUdp() {
 }
 
 // warm up in advance
-func buildSenderSlice() []client.Sender {
+func buildAndBootSenderSlice() []client.Sender {
 	// senderSlice
 	var senderSlice []client.Sender
 
@@ -83,7 +83,7 @@ func buildSenderSlice() []client.Sender {
 
 		// fail to build sender,due to net err
 		if nil != err {
-			zaplog.LOGGER.Error("build error", zap.Any("err", err))
+			zaplog.LOGGER.Error("build sender error whose dest is "+destTcpSvrAddrStr, zap.Any("err", err))
 			continue
 		}
 
@@ -133,22 +133,22 @@ func processConn(srcConn net.Conn) {
 		zaplog.LOGGER.Info(hex.EncodeToString(tempByteSlice))
 
 		// per dest/sender a goroutine
-		go func(senderSlice []client.Sender, tempByteSlice [] byte) {
-			if nil == senderSlice {
-				return
+		/*go func(senderSlice []client.Sender, tempByteSlice [] byte) {
+		if nil == senderSlice {
+			return
+		}*/
+
+		// need to dispatch data to each sender's data channel
+		for _, sender := range senderSlice {
+			if sender == nil || sender.Interrupted() {
+				continue
 			}
 
-			// need to dispatch data to each sender's data channel
-			for _, sender := range senderSlice {
-				if sender == nil || sender.IsClosed() {
-					continue
-				}
+			//go func(sender client.Sender) {
+			sender.GetSrcDataChan() <- tempByteSlice
+			//}(sender)
 
-				go func(sender client.Sender) {
-					sender.GetSrcDataChan() <- tempByteSlice
-				}(sender)
-
-			}
-		}(senderSlice, tempByteSlice)
+		}
+		//}(senderSlice, tempByteSlice)
 	}
 }
