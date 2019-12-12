@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"net"
-	"strconv"
 	"net-multiplier/config"
 	"net-multiplier/utils"
 	"net-multiplier/zaplog"
+	"strconv"
 )
 
 type Sender interface {

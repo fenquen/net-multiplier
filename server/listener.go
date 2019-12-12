@@ -12,6 +12,7 @@ import (
 )
 
 var destSvrAddrStrSlice = strings.Split(*config.DestSvrAddrs, config.DELIMITER)
+var senderSlice = buildSenderSlice()
 
 func ListenAndServeTcp() {
 	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destSvrAddrStrSlice))
@@ -63,30 +64,41 @@ func ServeUdp() {
 
 }
 
+// warm up in advance
+func buildSenderSlice() []client.Sender {
+	// senderSlice
+	var senderSlice []client.Sender
+
+	// actually empty dest slice
+	if nil == destSvrAddrStrSlice || len(destSvrAddrStrSlice) == 0 {
+		zaplog.Info("nil == destSvrAddrStrSlice || len(destSvrAddrStrSlice) == 0")
+		return senderSlice
+	}
+
+	destSvrNum := len(destSvrAddrStrSlice)
+	senderSlice = make([]client.Sender, destSvrNum, destSvrNum)
+
+	for a, destTcpSvrAddrStr := range destSvrAddrStrSlice {
+		sender, err := client.NewSender(destTcpSvrAddrStr, *config.Mode)
+
+		// fail to build sender,due to net err
+		if nil != err {
+			zaplog.LOGGER.Error("build error", zap.Any("err", err))
+			continue
+		}
+
+		senderSlice[a] = sender
+
+		sender.Start()
+	}
+
+	return senderSlice
+}
+
 func processConn(srcConn net.Conn) {
 	defer func() {
 		_ = srcConn.Close()
 	}()
-
-	// senderSlice
-	var senderSlice []client.Sender
-	if nil != destSvrAddrStrSlice && len(destSvrAddrStrSlice) > 0 {
-		destSvrNum := len(destSvrAddrStrSlice)
-		senderSlice = make([]client.Sender, destSvrNum, destSvrNum)
-
-		for a, destTcpSvrAddrStr := range destSvrAddrStrSlice {
-			sender, err := client.NewSender(destTcpSvrAddrStr, *config.Mode)
-
-			// fail to build sender,due to net err
-			if nil != err {
-				continue
-			}
-
-			senderSlice[a] = sender
-
-			sender.Start()
-		}
-	}
 
 	// loop
 	for {
@@ -126,7 +138,7 @@ func processConn(srcConn net.Conn) {
 
 			// need to dispatch data to each sender's data channel
 			for _, sender := range senderSlice {
-				if sender.IsClosed() {
+				if sender == nil || sender.IsClosed() {
 					continue
 				}
 

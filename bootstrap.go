@@ -21,6 +21,10 @@ func main() {
 
 	flag.Usage()
 
+	if nil != flag.CommandLine.Lookup("h") {
+		os.Exit(0)
+	}
+
 	if "" == strings.Trim(*config.DestSvrAddrs, " ") {
 		zaplog.LOGGER.Info("you actually did not specify a valid \"DestSvrAddrs\",it is virtually empty")
 		//flag.Usage()
