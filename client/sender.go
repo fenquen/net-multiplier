@@ -1,8 +1,6 @@
 package client
 
 import (
-	"encoding/hex"
-	"fmt"
 	"go.uber.org/zap"
 	"net"
 	"net-multiplier/config"
@@ -24,6 +22,8 @@ type Sender interface {
 	SetConn2DestSvr(conn2DestSvr net.Conn)
 	SetSrcDataChan(srcDataChan chan []byte)
 	SetSwitcher(switcher chan bool)
+
+	//Write(byteSlice []byte) (int, error)
 }
 
 func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
@@ -54,7 +54,11 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 			return nil, err
 		}
 
-		result = &TcpSender{}
+		tcpSender := &TcpSender{}
+		tcpSender.localAddr = localClientAddr
+		tcpSender.remoteAddr = destSvrAddr
+
+		result = tcpSender
 	case config.UDP_MODE:
 		// localClientAddr
 		localClientAddr, err := net.ResolveUDPAddr(mode,
@@ -72,13 +76,17 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 		}
 
 		// conn2DestSvr
-		conn2DestSvr, err = net.DialUDP(mode, localClientAddr, destSvrAddr)
+		conn2DestSvr, err = net.ListenUDP(mode, localClientAddr)
 		if nil != err {
 			zaplog.LOGGER.Error("DialUDP conn2DestSvr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
 		}
 
-		result = &UdpSender{}
+		udpSender := &UdpSender{}
+		udpSender.localAddr = localClientAddr
+		udpSender.remoteAddr = destSvrAddr
+
+		result = udpSender
 	}
 
 	result.SetConn2DestSvr(conn2DestSvr)
@@ -87,77 +95,4 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 
 	return result, nil
 
-}
-
-type SenderBase struct {
-	conn2DestSvr net.Conn
-	srcDataChan  chan []byte
-	switcher     chan bool
-	closed       bool
-}
-
-func (senderBase *SenderBase) Start() {
-	go senderBase.Run()
-}
-
-func (senderBase *SenderBase) Run() {
-	defer func() {
-		recover()
-
-		senderBase.Close();
-	}()
-
-	for {
-		// whether need to be interrupted
-		select {
-		case v := <-senderBase.switcher:
-			if v {
-				return
-			}
-		default:
-		}
-
-		select {
-		case byteSlice := <-senderBase.srcDataChan:
-			_, err := senderBase.conn2DestSvr.Write(byteSlice)
-			if nil != err {
-				zaplog.LOGGER.Info("senderBase.conn2DestSvr.Write", zap.Any("err", err))
-				return
-			}
-			zaplog.LOGGER.Info("successfully write data to dest " + hex.EncodeToString(byteSlice))
-			zaplog.LOGGER.Info(fmt.Sprint(senderBase.conn2DestSvr.LocalAddr()))
-			zaplog.LOGGER.Info(fmt.Sprint(senderBase.conn2DestSvr.RemoteAddr()))
-		}
-	}
-}
-
-func (senderBase *SenderBase) Interrupt() {
-	senderBase.switcher <- true
-	senderBase.Close()
-}
-
-func (senderBase *SenderBase) Close() {
-	senderBase.closed = true
-	_ = senderBase.conn2DestSvr.Close()
-	close(senderBase.srcDataChan)
-	close(senderBase.switcher)
-}
-
-func (senderBase *SenderBase) IsClosed() bool {
-	return senderBase.closed
-}
-
-func (senderBase *SenderBase) GetSrcDataChan() chan [] byte {
-	return senderBase.srcDataChan
-}
-
-func (senderBase *SenderBase) SetConn2DestSvr(conn2DestSvr net.Conn) {
-	senderBase.conn2DestSvr = conn2DestSvr
-}
-
-func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan []byte) {
-	senderBase.srcDataChan = srcDataChan
-}
-func (senderBase *SenderBase) SetSwitcher(switcher chan bool) {
-	senderBase.switcher = switcher
 }
