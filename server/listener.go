@@ -102,25 +102,27 @@ func processConn(srcConn net.Conn) {
 
 	// loop
 	for {
-		tempByteSlice := make([]byte, config.TempByteSliceLen, config.TempByteSliceLen)
+		tempByteSlice := make([]byte, *config.TempByteSliceLen, *config.TempByteSliceLen)
 
 		//_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
 		zaplog.LOGGER.Info("before srcConn.Read(tempByteSlice)")
 		readCount, err := srcConn.Read(tempByteSlice)
-		zaplog.LOGGER.Info("readCount, err := srcConn.Read(tempByteSlice)", zap.Any("readCount", readCount), zap.Any("err", err))
+		zaplog.LOGGER.Info("readCount, err := srcConn.Read(tempByteSlice)",
+			zap.Any("readCount", readCount), zap.Any("err", err))
 
 		// meanings srcTcpConn is closed by client
 		if 0 >= readCount && err != nil /*io.EOF*/ {
-			zaplog.LOGGER.Info("srcConn.Read(tempByteSlice), 0 >= readCount && err != io.EOF")
+			zaplog.LOGGER.Error("srcConn.Read(tempByteSlice), 0 >= readCount && err != nil",
+				zap.Any("err", err))
 
-			if nil != senderSlice {
+			/*if nil != senderSlice {
 				// interrupt all sender serving this srcTcpConn
 				for _, sender := range senderSlice {
 					if nil != sender {
 						sender.Interrupt()
 					}
 				}
-			}
+			}*/
 
 			return
 		}
@@ -131,7 +133,7 @@ func processConn(srcConn net.Conn) {
 		zaplog.LOGGER.Info(hex.EncodeToString(tempByteSlice))
 
 		// per dest/sender a goroutine
-		go func(senderSlice []client.Sender, data [] byte) {
+		go func(senderSlice []client.Sender, tempByteSlice [] byte) {
 			if nil == senderSlice {
 				return
 			}
@@ -143,7 +145,7 @@ func processConn(srcConn net.Conn) {
 				}
 
 				go func(sender client.Sender) {
-					sender.GetSrcDataChan() <- data
+					sender.GetSrcDataChan() <- tempByteSlice
 				}(sender)
 
 			}

@@ -24,11 +24,7 @@ var (
 
 	Mode = flag.String("mode", "udp", "tcp or udp")
 
-	TempByteSliceLen = *(flag.Int("tempByteSliceLen",2048,"the temp byte slice size for tcp/udp read"))
+	TempByteSliceLen = flag.Int("tempByteSliceLen",2048,"the temp byte slice size for tcp/udp read")
 )
 
 var APP_NAME = "net-multiplier"
-
-func init() {
-	flag.Parse()
-}

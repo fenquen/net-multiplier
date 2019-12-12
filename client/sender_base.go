@@ -24,8 +24,10 @@ func (senderBase *SenderBase) Start() {
 
 func (senderBase *SenderBase) Run() {
 	defer func() {
-		recover()
-
+		recoveredErr := recover()
+		if nil != recoveredErr {
+			zaplog.LOGGER.Error("recovered error ", zap.Any("err", recoveredErr))
+		}
 		senderBase.Close();
 	}()
 
@@ -65,7 +67,7 @@ func (senderBase *SenderBase) Run() {
 
 func (senderBase *SenderBase) Interrupt() {
 	senderBase.switcher <- true
-	senderBase.Close()
+	//senderBase.Close()
 }
 
 func (senderBase *SenderBase) Close() {
