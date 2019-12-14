@@ -23,6 +23,8 @@ type Sender interface {
 	SetSrcDataChan(srcDataChan chan []byte)
 	SetSwitcher(switcher chan bool)
 
+	GetReportUnavailableChan() chan bool
+
 	//Write(byteSlice []byte) (int, error)
 }
 

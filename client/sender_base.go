@@ -16,6 +16,9 @@ type SenderBase struct {
 	interrupted  bool
 	localAddr    net.Addr
 	remoteAddr   net.Addr
+
+	reportUnavailableChan chan bool
+	available             bool
 }
 
 func (senderBase *SenderBase) Start() {
@@ -28,12 +31,16 @@ func (senderBase *SenderBase) Run() {
 		if nil != recoveredErr {
 			zaplog.LOGGER.Error("recovered error ", zap.Any("err", recoveredErr))
 		}
-		senderBase.Close();
+
+		// due to panic or interrupt
+		senderBase.reportUnavailable()
+		//senderBase.Close();
 	}()
 
 	for {
 		// whether need to be interrupted
 		select {
+		// interrupted
 		case v := <-senderBase.switcher:
 			if v {
 				return
@@ -42,7 +49,11 @@ func (senderBase *SenderBase) Run() {
 		}
 
 		select {
-		case byteSlice := <-senderBase.srcDataChan:
+		case byteSlice, allRight := <-senderBase.srcDataChan:
+			// means the chan is closed
+			if !allRight {
+				return
+			}
 			var err error
 			switch *config.Mode {
 			case config.TCP_MODE:
@@ -54,15 +65,23 @@ func (senderBase *SenderBase) Run() {
 			}
 
 			if nil != err {
-				zaplog.LOGGER.Info("senderBase.conn2DestSvr.Write", zap.Any("err", err))
-				return
+				panic(err)
 			}
 
-			zaplog.LOGGER.Info("successfully write data to dest " + hex.EncodeToString(byteSlice))
+			fmt.Println("successfully write data to dest " + hex.EncodeToString(byteSlice))
 			zaplog.LOGGER.Info(fmt.Sprint(senderBase.localAddr))
 			zaplog.LOGGER.Info(fmt.Sprint(senderBase.remoteAddr))
 		}
 	}
+}
+
+func (senderBase *SenderBase) reportUnavailable() {
+	senderBase.reportUnavailableChan <- true
+	senderBase.available = false
+}
+
+func (senderBase *SenderBase) GetReportUnavailableChan() chan bool {
+	return senderBase.reportUnavailableChan
 }
 
 func (senderBase *SenderBase) Interrupt() {
@@ -70,8 +89,8 @@ func (senderBase *SenderBase) Interrupt() {
 	senderBase.interrupted = true
 }
 
+// should be triggered by other
 func (senderBase *SenderBase) Close() {
-
 	_ = senderBase.conn2DestSvr.Close()
 	close(senderBase.srcDataChan)
 	close(senderBase.switcher)

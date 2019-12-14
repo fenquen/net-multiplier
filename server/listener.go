@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"net"
@@ -9,10 +10,10 @@ import (
 	"net-multiplier/config"
 	"net-multiplier/zaplog"
 	"strings"
+	"sync"
 )
 
 var destSvrAddrStrSlice = strings.Split(*config.DestSvrAddrs, config.DELIMITER)
-var senderSlice = buildAndBootSenderSlice()
 
 func ListenAndServeTcp() {
 	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destSvrAddrStrSlice))
@@ -46,7 +47,7 @@ func ListenAndServeTcp() {
 }
 
 func ServeUdp() {
-	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destSvrAddrStrSlice))
+	zaplog.LOGGER.Info("destSvrAddr slice " + fmt.Sprint(destSvrAddrStrSlice))
 
 	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, *config.LocalSvrAddr)
 	if nil != err {
@@ -65,20 +66,19 @@ func ServeUdp() {
 }
 
 // warm up in advance
-func buildAndBootSenderSlice() []client.Sender {
+func buildAndBootSenderSlice() ([]client.Sender, error) {
 	// senderSlice
 	var senderSlice []client.Sender
 
 	// actually empty dest slice
 	if nil == destSvrAddrStrSlice || len(destSvrAddrStrSlice) == 0 {
-		zaplog.Info("nil == destSvrAddrStrSlice || len(destSvrAddrStrSlice) == 0")
-		return senderSlice
+		return nil, errors.New("nil == destSvrAddrStrSlice || len(destSvrAddrStrSlice) == 0")
 	}
 
 	destSvrNum := len(destSvrAddrStrSlice)
-	senderSlice = make([]client.Sender, destSvrNum, destSvrNum)
+	senderSlice = make([]client.Sender, 0, destSvrNum)
 
-	for a, destTcpSvrAddrStr := range destSvrAddrStrSlice {
+	for _, destTcpSvrAddrStr := range destSvrAddrStrSlice {
 		sender, err := client.NewSender(destTcpSvrAddrStr, *config.Mode)
 
 		// fail to build sender,due to net err
@@ -86,19 +86,30 @@ func buildAndBootSenderSlice() []client.Sender {
 			zaplog.LOGGER.Error("build sender error whose dest is "+destTcpSvrAddrStr, zap.Any("err", err))
 			continue
 		}
-
-		senderSlice[a] = sender
-
+		senderSlice = append(senderSlice, sender)
 		sender.Start()
 	}
 
-	return senderSlice
+	if len(senderSlice) == 0 {
+		return nil, errors.New("build senders totally failed ")
+	}
+
+	return senderSlice, nil
 }
 
 func processConn(srcConn net.Conn) {
 	defer func() {
+		recoveredErr := recover()
+		if recoveredErr != nil {
+			zaplog.LOGGER.Error("processConn panic ", zap.Any("err", recoveredErr))
+		}
 		_ = srcConn.Close()
 	}()
+
+	senderSlice, err := buildAndBootSenderSlice()
+	if nil != err {
+		panic(err)
+	}
 
 	// loop
 	for {
@@ -115,14 +126,14 @@ func processConn(srcConn net.Conn) {
 			zaplog.LOGGER.Error("srcConn.Read(tempByteSlice), 0 >= readCount && err != nil",
 				zap.Any("err", err))
 
-			/*if nil != senderSlice {
+			if *config.Mode == config.TCP_MODE {
 				// interrupt all sender serving this srcTcpConn
 				for _, sender := range senderSlice {
 					if nil != sender {
 						sender.Interrupt()
 					}
 				}
-			}*/
+			}
 
 			return
 		}
@@ -130,7 +141,7 @@ func processConn(srcConn net.Conn) {
 		tempByteSlice = tempByteSlice[0:readCount]
 
 		//zaplog.LOGGER.Info("receive src data from " + srcConn.RemoteAddr().String())
-		zaplog.LOGGER.Info(hex.EncodeToString(tempByteSlice))
+		fmt.Println("data received ", hex.EncodeToString(tempByteSlice))
 
 		// per dest/sender a goroutine
 		/*go func(senderSlice []client.Sender, tempByteSlice [] byte) {
@@ -139,16 +150,30 @@ func processConn(srcConn net.Conn) {
 		}*/
 
 		// need to dispatch data to each sender's data channel
+		waitGroup := &sync.WaitGroup{}
+		waitGroup.Add(len(senderSlice))
 		for _, sender := range senderSlice {
-			if sender == nil || sender.Interrupted() {
+			// sender.interrupt() called by current routine,so current routine can immediately know the state
+			if sender == nil {
+				waitGroup.Done()
 				continue
 			}
 
-			//go func(sender client.Sender) {
-			sender.GetSrcDataChan() <- tempByteSlice
-			//}(sender)
+			select {
+			case <-sender.GetReportUnavailableChan():
+				sender.Close()
+				sender = nil
+				waitGroup.Done()
+				continue
+			default:
+			}
 
+			go func(sender client.Sender) {
+				sender.GetSrcDataChan() <- tempByteSlice
+				waitGroup.Done()
+			}(sender)
 		}
+		waitGroup.Wait()
 		//}(senderSlice, tempByteSlice)
 	}
 }
