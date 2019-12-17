@@ -7,6 +7,7 @@ import (
 	"net"
 	"net-multiplier/config"
 	"net-multiplier/zaplog"
+	"time"
 )
 
 type SenderBase struct {
@@ -32,8 +33,11 @@ func (senderBase *SenderBase) Run() {
 			zaplog.LOGGER.Error("recovered error ", zap.Any("err", recoveredErr))
 		}
 
+		_ = senderBase.conn2DestSvr.Close()
+
 		// due to panic or interrupt
 		senderBase.reportUnavailable()
+
 		//senderBase.Close();
 	}()
 
@@ -71,6 +75,7 @@ func (senderBase *SenderBase) Run() {
 			fmt.Println("successfully write data to dest " + hex.EncodeToString(byteSlice))
 			zaplog.LOGGER.Info(fmt.Sprint(senderBase.localAddr))
 			zaplog.LOGGER.Info(fmt.Sprint(senderBase.remoteAddr))
+		case <-time.After(time.Millisecond):
 		}
 	}
 }
@@ -78,22 +83,23 @@ func (senderBase *SenderBase) Run() {
 func (senderBase *SenderBase) reportUnavailable() {
 	senderBase.reportUnavailableChan <- true
 	senderBase.available = false
+	close(senderBase.reportUnavailableChan)
 }
 
 func (senderBase *SenderBase) GetReportUnavailableChan() chan bool {
 	return senderBase.reportUnavailableChan
 }
 
+// used by other element
 func (senderBase *SenderBase) Interrupt() {
 	senderBase.switcher <- true
 	senderBase.interrupted = true
+	close(senderBase.switcher)
 }
 
 // should be triggered by other
 func (senderBase *SenderBase) Close() {
-	_ = senderBase.conn2DestSvr.Close()
 	close(senderBase.srcDataChan)
-	close(senderBase.switcher)
 }
 
 func (senderBase *SenderBase) Interrupted() bool {

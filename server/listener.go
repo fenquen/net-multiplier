@@ -131,6 +131,7 @@ func processConn(srcConn net.Conn) {
 				for _, sender := range senderSlice {
 					if nil != sender {
 						sender.Interrupt()
+						sender.Close()
 					}
 				}
 			}
