@@ -1,0 +1,1 @@
+go build -o ./net_multiplier.exe -gcflags "all=-N -l" net-multiplier
