@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/hex"
-	"fmt"
 	"go.uber.org/zap"
 	"net"
 	"net-multiplier/config"
@@ -72,9 +71,8 @@ func (senderBase *SenderBase) Run() {
 				panic(err)
 			}
 
-			fmt.Println("successfully write data to dest " + hex.EncodeToString(byteSlice))
-			zaplog.LOGGER.Info(fmt.Sprint(senderBase.localAddr))
-			zaplog.LOGGER.Info(fmt.Sprint(senderBase.remoteAddr))
+			zaplog.LOGGER.Debug("successfully write data to dest "+hex.EncodeToString(byteSlice),
+				zap.Any("localAddr", "senderBase.localAddr"), zap.Any("remoteAddr", senderBase.remoteAddr))
 		case <-time.After(time.Millisecond):
 		}
 	}
