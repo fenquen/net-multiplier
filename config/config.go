@@ -15,7 +15,7 @@ var (
 
 	// 192.168.100.100:8889,192.168.100.100:8888
 	DestSvrAddrs = flag.String("dest.svr.addrs",
-		"192.168.100.120:8857",
+		"192.168.100.120:8800",
 		"the destinations that the data is relayed to,it is a comma-delimited string,e.g. 192.168.1.6:9060,192.168.1.60:9060")
 
 	LocalClientHost = flag.String("local.client.host",
@@ -30,3 +30,5 @@ var (
 )
 
 var APP_NAME = "net-multiplier"
+
+func init() { flag.Parse() }

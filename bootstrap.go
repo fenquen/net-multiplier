@@ -19,7 +19,6 @@ func main() {
 		}
 	}()
 
-	flag.Parse()
 	flag.Usage()
 
 	if nil != flag.CommandLine.Lookup("h") {
