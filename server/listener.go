@@ -9,14 +9,17 @@ import (
 	"net-multiplier/client"
 	"net-multiplier/config"
 	"net-multiplier/zaplog"
+	"net/http"
 	"strings"
 	"sync"
 )
 
-var destSvrAddrStrSlice = strings.Split(*config.DestSvrAddrs, config.DELIMITER)
+var destAddrStrSlice = strings.Split(*config.DestSvrAddrs, config.DELIMITER)
+var destAddr_sender = make(map[string]client.Sender, 8)
+var mutex sync.Mutex
 
 func ListenAndServeTcp() {
-	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destSvrAddrStrSlice))
+	zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destAddrStrSlice))
 
 	// mode tcp
 	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_MODE, *config.LocalSvrAddr)
@@ -47,7 +50,7 @@ func ListenAndServeTcp() {
 }
 
 func ServeUdp() {
-	zaplog.LOGGER.Info("destSvrAddr slice " + fmt.Sprint(destSvrAddrStrSlice))
+	zaplog.LOGGER.Info("destSvrAddr slice " + fmt.Sprint(destAddrStrSlice))
 
 	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, *config.LocalSvrAddr)
 	if nil != err {
@@ -66,35 +69,36 @@ func ServeUdp() {
 }
 
 // warm up in advance
-func buildAndBootSenderSlice() ([]client.Sender, error) {
+func buildAndBootSenderSlice() error {
 	// senderSlice
-	var senderSlice []client.Sender
 
 	// actually empty dest slice
-	if nil == destSvrAddrStrSlice || len(destSvrAddrStrSlice) == 0 {
-		return nil, errors.New("nil == destSvrAddrStrSlice || len(destSvrAddrStrSlice) == 0")
+	if nil == destAddrStrSlice || len(destAddrStrSlice) == 0 {
+		return errors.New("nil == destAddrStrSlice || len(destAddrStrSlice) == 0")
 	}
 
-	destSvrNum := len(destSvrAddrStrSlice)
-	senderSlice = make([]client.Sender, 0, destSvrNum)
+	destSvrNum := len(destAddrStrSlice)
+	senderSlice := make([]client.Sender, 0, destSvrNum)
 
-	for _, destTcpSvrAddrStr := range destSvrAddrStrSlice {
-		sender, err := client.NewSender(destTcpSvrAddrStr, *config.Mode)
+	for _, destAddrStr := range destAddrStrSlice {
+		sender, err := client.NewSender(destAddrStr, *config.Mode)
 
 		// fail to build sender,due to net err
 		if nil != err {
-			zaplog.LOGGER.Error("build sender error whose dest is "+destTcpSvrAddrStr, zap.Any("err", err))
+			zaplog.LOGGER.Error("build sender error whose dest is "+destAddrStr, zap.Any("err", err))
 			continue
 		}
-		senderSlice = append(senderSlice, sender)
+
+		destAddr_sender[destAddrStr] = sender
+		//senderSlice = append(senderSlice, sender)
 		sender.Start()
 	}
 
 	if len(senderSlice) == 0 {
-		return nil, errors.New("build senders totally failed ")
+		return errors.New("build senders totally failed ")
 	}
 
-	return senderSlice, nil
+	return nil
 }
 
 func processConn(srcConn net.Conn) {
@@ -106,7 +110,7 @@ func processConn(srcConn net.Conn) {
 		_ = srcConn.Close()
 	}()
 
-	senderSlice, err := buildAndBootSenderSlice()
+	err := buildAndBootSenderSlice()
 	if nil != err {
 		panic(err)
 	}
@@ -128,7 +132,7 @@ func processConn(srcConn net.Conn) {
 
 			if *config.Mode == config.TCP_MODE {
 				// interrupt all sender serving this srcTcpConn
-				for _, sender := range senderSlice {
+				for _, sender := range destAddr_sender {
 					if nil != sender {
 						sender.Interrupt()
 						sender.Close()
@@ -152,8 +156,10 @@ func processConn(srcConn net.Conn) {
 
 		// need to dispatch data to each sender's data channel
 		waitGroup := &sync.WaitGroup{}
-		waitGroup.Add(len(senderSlice))
-		for _, sender := range senderSlice {
+		waitGroup.Add(len(destAddr_sender))
+
+		mutex.Lock()
+		for _, sender := range destAddr_sender {
 			// sender.interrupt() called by current routine,so current routine can immediately know the state
 			if sender == nil {
 				waitGroup.Done()
@@ -174,7 +180,54 @@ func processConn(srcConn net.Conn) {
 				waitGroup.Done()
 			}(sender)
 		}
+		mutex.Unlock()
+
 		waitGroup.Wait()
 		//}(senderSlice, tempByteSlice)
+	}
+}
+
+func ServeHttp() {
+	http.HandleFunc("/multiplier/addDests", func(writer http.ResponseWriter, request *http.Request) {
+		destAddrStrs := request.FormValue("destAddrStrs")
+
+		mutex.Lock()
+		for _, destAddrStr := range strings.Split(destAddrStrs, ",") {
+
+			sender, err := client.NewSender(destAddrStr, *config.Mode)
+
+			// fail to build sender,due to net err
+			if nil != err {
+				zaplog.LOGGER.Error("build sender error whose dest is "+destAddrStr, zap.Any("err", err))
+				continue
+			}
+
+			destAddr_sender[destAddrStr] = sender
+			//senderSlice = append(senderSlice, sender)
+			sender.Start()
+		}
+		mutex.Unlock()
+	})
+
+	http.HandleFunc("/multiplier/delDests", func(writer http.ResponseWriter, request *http.Request) {
+		destAddrStrs := request.FormValue("destAddrStrs")
+
+		mutex.Lock()
+		for _, destAddrStr := range strings.Split(destAddrStrs, ",") {
+			sender := destAddr_sender[destAddrStr]
+			if sender == nil {
+				continue
+			}
+
+			delete(destAddr_sender, destAddrStr)
+
+			sender.Interrupt()
+		}
+		mutex.Unlock()
+	})
+
+	if err := http.ListenAndServe(*config.LocalHttpSvrAddr, nil); err != nil {
+		zaplog.LOGGER.Info("http.ListenAndServe err")
+		panic(err)
 	}
 }

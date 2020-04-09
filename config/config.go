@@ -27,6 +27,10 @@ var (
 	Mode = flag.String("mode", "udp", "tcp or udp")
 
 	TempByteSliceLen = flag.Int("tempByteSliceLen", 2048, "the temp byte slice size for tcp/udp read")
+
+	LocalHttpSvrAddr = flag.String("local.http.svr.addr",
+		"192.168.99.60:10080",
+		"the http server address where the handle requests")
 )
 
 var APP_NAME = "net-multiplier"

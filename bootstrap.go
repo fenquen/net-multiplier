@@ -31,6 +31,8 @@ func main() {
 		//os.Exit(0)
 	}
 
+	go server.ServeHttp()
+
 	zaplog.LOGGER.Info("mode " + *config.Mode)
 
 	// verify mode
