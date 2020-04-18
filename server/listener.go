@@ -2,12 +2,14 @@ package server
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"net"
 	"net-multiplier/client"
 	"net-multiplier/config"
+	"net-multiplier/model/httpResponse"
 	"net-multiplier/zaplog"
 	"net/http"
 	"strings"
@@ -77,8 +79,8 @@ func buildAndBootSenderSlice() error {
 		return errors.New("nil == destAddrStrSlice || len(destAddrStrSlice) == 0")
 	}
 
-	destSvrNum := len(destAddrStrSlice)
-	senderSlice := make([]client.Sender, 0, destSvrNum)
+	// := len(destAddrStrSlice)
+	//senderSlice := make([]client.Sender, 0, destSvrNum)
 
 	for _, destAddrStr := range destAddrStrSlice {
 		sender, err := client.NewSender(destAddrStr, *config.Mode)
@@ -94,7 +96,7 @@ func buildAndBootSenderSlice() error {
 		sender.Start()
 	}
 
-	if len(senderSlice) == 0 {
+	if len(destAddr_sender) == 0 {
 		return errors.New("build senders totally failed ")
 	}
 
@@ -120,9 +122,9 @@ func processConn(srcConn net.Conn) {
 		tempByteSlice := make([]byte, *config.TempByteSliceLen, *config.TempByteSliceLen)
 
 		//_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
-		zaplog.LOGGER.Info("before srcConn.Read(tempByteSlice)")
+		zaplog.LOGGER.Debug("before srcConn.Read(tempByteSlice)")
 		readCount, err := srcConn.Read(tempByteSlice)
-		zaplog.LOGGER.Info("readCount, err := srcConn.Read(tempByteSlice)",
+		zaplog.LOGGER.Debug("readCount, err := srcConn.Read(tempByteSlice)",
 			zap.Any("readCount", readCount), zap.Any("err", err))
 
 		// meanings srcTcpConn is closed by client
@@ -156,9 +158,9 @@ func processConn(srcConn net.Conn) {
 
 		// need to dispatch data to each sender's data channel
 		waitGroup := &sync.WaitGroup{}
-		waitGroup.Add(len(destAddr_sender))
 
 		mutex.Lock()
+		waitGroup.Add(len(destAddr_sender))
 		for _, sender := range destAddr_sender {
 			// sender.interrupt() called by current routine,so current routine can immediately know the state
 			if sender == nil {
@@ -188,7 +190,23 @@ func processConn(srcConn net.Conn) {
 }
 
 func ServeHttp() {
+
+	handlePanic := func(writer http.ResponseWriter) {
+		recoverErr := recover()
+		if recoverErr == nil {
+			return
+		}
+
+		zaplog.LOGGER.Error("", zap.Any("recoverErr", recoverErr))
+
+		response := httpResponse.Fail(fmt.Sprint(recoverErr))
+		byteSlice, _ := json.Marshal(response)
+		_, _ = writer.Write(byteSlice)
+	}
+
 	http.HandleFunc("/multiplier/addDests", func(writer http.ResponseWriter, request *http.Request) {
+		defer handlePanic(writer)
+
 		destAddrStrs := request.FormValue("destAddrStrs")
 
 		mutex.Lock()
@@ -203,13 +221,17 @@ func ServeHttp() {
 			}
 
 			destAddr_sender[destAddrStr] = sender
-			//senderSlice = append(senderSlice, sender)
+
 			sender.Start()
 		}
 		mutex.Unlock()
+
+		_, _ = writer.Write(httpResponse.SUCCESS)
 	})
 
 	http.HandleFunc("/multiplier/delDests", func(writer http.ResponseWriter, request *http.Request) {
+		defer handlePanic(writer)
+
 		destAddrStrs := request.FormValue("destAddrStrs")
 
 		mutex.Lock()
@@ -224,6 +246,8 @@ func ServeHttp() {
 			sender.Interrupt()
 		}
 		mutex.Unlock()
+
+		_, _ = writer.Write(httpResponse.SUCCESS)
 	})
 
 	if err := http.ListenAndServe(*config.LocalHttpSvrAddr, nil); err != nil {
