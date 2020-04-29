@@ -1,5 +1,5 @@
 # net-multiplier
-a simple tcp/udp multiplier written by golang .It duplicates a single tcp/udp input into multi outputs at the same time. 
+a simple tcp/udp multiplier written by golang .It duplicates a single tcp/udp input into multi outputs at the same time with independent listener and senders per task
 
 ### Theory
 ![Theory](./assets/net-multiplier.png)
