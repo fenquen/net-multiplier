@@ -17,13 +17,16 @@ type Sender interface {
 	Close()
 	Interrupted() bool
 
-	GetSrcDataChan() chan [] byte
+	GetSrcDataChan() chan []byte
 
 	SetConn2DestSvr(conn2DestSvr net.Conn)
 	SetSrcDataChan(srcDataChan chan []byte)
 	SetSwitcher(switcher chan bool)
 
 	GetReportUnavailableChan() chan bool
+
+	SetMode(mode string)
+	GetMode() string
 
 	//Write(byteSlice []byte) (int, error)
 }
@@ -36,21 +39,21 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 	case config.TCP_MODE:
 		// localClientAddr
 		localClientAddr, err := net.ResolveTCPAddr(mode,
-			*config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
+			*config.LocalClientHostStr+":"+strconv.Itoa(int(utils.GetLocalClientPort())))
 		if nil != err {
-			zaplog.LOGGER.Error("ResolveTCPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHost", *config.LocalClientHost))
+			zaplog.LOGGER.Error("ResolveTCPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHostStr", *config.LocalClientHostStr))
 			return nil, err
 		}
 
-		// destSvrAddr
-		destSvrAddr, err := net.ResolveTCPAddr(mode, destTcpSvrAddrStr)
+		// destAddr
+		destAddr, err := net.ResolveTCPAddr(mode, destTcpSvrAddrStr)
 		if nil != err {
-			zaplog.LOGGER.Error("ResolveTCPAddr destSvrAddr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
+			zaplog.LOGGER.Error("ResolveTCPAddr destAddr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
 		}
 
 		// conn2DestSvr
-		conn2DestSvr, err = net.DialTCP(mode, localClientAddr, destSvrAddr)
+		conn2DestSvr, err = net.DialTCP(mode, localClientAddr, destAddr)
 		if nil != err {
 			zaplog.LOGGER.Error("DialTCP conn2DestSvr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
@@ -58,22 +61,22 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 
 		tcpSender := &TcpSender{}
 		tcpSender.localAddr = localClientAddr
-		tcpSender.remoteAddr = destSvrAddr
+		tcpSender.remoteAddr = destAddr
 
 		result = tcpSender
 	case config.UDP_MODE:
 		// localClientAddr
 		localClientAddr, err := net.ResolveUDPAddr(mode,
-			*config.LocalClientHost+":"+strconv.Itoa(int(utils.GetLocalTcpClientPort())))
+			*config.LocalClientHostStr+":"+strconv.Itoa(int(utils.GetLocalClientPort())))
 		if nil != err {
-			zaplog.LOGGER.Error("ResolveUDPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHost", "LocalClientHost"))
+			zaplog.LOGGER.Error("ResolveUDPAddr localClientAddr", zap.Any("err", err), zap.Any("LocalClientHostStr", "LocalClientHostStr"))
 			return nil, err
 		}
 
-		// destSvrAddr
-		destSvrAddr, err := net.ResolveUDPAddr(mode, destTcpSvrAddrStr)
+		// destAddr
+		destAddr, err := net.ResolveUDPAddr(mode, destTcpSvrAddrStr)
 		if nil != err {
-			zaplog.LOGGER.Error("ResolveUDPAddr destSvrAddr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
+			zaplog.LOGGER.Error("ResolveUDPAddr destAddr", zap.Any("err", err), zap.Any("destTcpSvrAddrStr", destTcpSvrAddrStr))
 			return nil, err
 		}
 
@@ -86,7 +89,7 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 
 		udpSender := &UdpSender{}
 		udpSender.localAddr = localClientAddr
-		udpSender.remoteAddr = destSvrAddr
+		udpSender.remoteAddr = destAddr
 
 		result = udpSender
 	}

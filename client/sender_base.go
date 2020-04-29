@@ -19,6 +19,8 @@ type SenderBase struct {
 
 	reportUnavailableChan chan bool
 	available             bool
+
+	mode string
 }
 
 func (senderBase *SenderBase) Start() {
@@ -58,7 +60,7 @@ func (senderBase *SenderBase) Run() {
 				return
 			}
 			var err error
-			switch *config.Mode {
+			switch senderBase.mode {
 			case config.TCP_MODE:
 				_, err = senderBase.conn2DestSvr.Write(byteSlice)
 			case config.UDP_MODE:
@@ -104,7 +106,7 @@ func (senderBase *SenderBase) Interrupted() bool {
 	return senderBase.interrupted
 }
 
-func (senderBase *SenderBase) GetSrcDataChan() chan [] byte {
+func (senderBase *SenderBase) GetSrcDataChan() chan []byte {
 	return senderBase.srcDataChan
 }
 
@@ -117,4 +119,12 @@ func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan []byte) {
 }
 func (senderBase *SenderBase) SetSwitcher(switcher chan bool) {
 	senderBase.switcher = switcher
+}
+
+func (senderBase *SenderBase) SetMode(mode string) {
+	senderBase.mode = mode
+}
+
+func (senderBase *SenderBase) GetMode() string {
+	return senderBase.mode
 }

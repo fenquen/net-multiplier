@@ -7,12 +7,11 @@ import (
 	"net-multiplier/server"
 	"net-multiplier/zaplog"
 	"os"
-	"strings"
 )
 
 func main() {
 	defer func() {
-		zaplog.LOGGER.Sync()
+		_ = zaplog.LOGGER.Sync()
 		err := recover()
 		if nil != err {
 			zaplog.LOGGER.Error(fmt.Sprint(err))
@@ -25,25 +24,24 @@ func main() {
 		os.Exit(0)
 	}
 
-	if "" == strings.Trim(*config.DestSvrAddrs, " ") {
-		zaplog.LOGGER.Info("you actually did not specify a valid \"DestSvrAddrs\",it is virtually empty")
+	/*if "" == strings.Trim(*config.DestSvrAddrs, " ") {
+		zaplog.LOGGER.Info("you actually did not specify a valid \"DestSvrAddrs\" in config,it is virtually empty")
 		//flag.Usage()
 		//os.Exit(0)
-	}
+	}*/
+	zaplog.LOGGER.Info("defaultMode " + *config.DefaultMode)
 
-	go server.ServeHttp()
-
-	zaplog.LOGGER.Info("mode " + *config.Mode)
+	server.ServeHttp()
 
 	// verify mode
-	switch *config.Mode {
+	/*switch *config.DefaultMode {
 	case config.TCP_MODE:
-		server.ListenAndServeTcp()
+		server.listenAndServeTcp()
 	case config.UDP_MODE:
-		server.ServeUdp()
+		server.serveUdp()
 	default:
 		zaplog.LOGGER.Info("mode must be tcp or udp")
 		os.Exit(0)
-	}
+	}*/
 
 }
