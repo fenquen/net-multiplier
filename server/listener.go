@@ -45,8 +45,17 @@ func ServeHttp() {
 
 		destAddrsStr := request.FormValue("destAddrsStr")
 		mode := request.FormValue("mode")
+		tempByteSliceLenStr := request.FormValue("tempByteSliceLen")
 
-		mutex.Lock()
+		// handle tempByteSliceLenStr
+		tempByteSliceLen, err := strconv.Atoi(tempByteSliceLenStr)
+		if err != nil {
+			zaplog.LOGGER.Info("tempByteSliceLenStr can not be converted to int", zap.Any("tempByteSliceLenStr", tempByteSliceLenStr))
+			tempByteSliceLen = *config.DefaultTempByteSliceLen
+		}
+		if tempByteSliceLen == 0 {
+			tempByteSliceLen = *config.DefaultTempByteSliceLen
+		}
 
 		// build senders
 		senderSlice, err := buildSenders(destAddrsStr, mode)
@@ -58,7 +67,7 @@ func ServeHttp() {
 		}
 
 		// build listener
-		err, task := buildLocalSvr(mode, senderSlice)
+		err, task := buildLocalSvr(mode, senderSlice, tempByteSliceLen)
 		if err != nil {
 			for _, sender := range senderSlice {
 				sender.Interrupt()
@@ -123,7 +132,7 @@ func buildSenders(destAddrsStr, mode string) ([]client.Sender, error) {
 	return senderSlice, nil
 }
 
-func buildLocalSvr(mode string, senderSlice []client.Sender) (error, *model.Task) {
+func buildLocalSvr(mode string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
 	// use default mode configured in config
 	if mode == "" {
 		mode = *config.DefaultMode
@@ -137,9 +146,9 @@ func buildLocalSvr(mode string, senderSlice []client.Sender) (error, *model.Task
 
 	switch mode {
 	case config.TCP_MODE:
-		err, task = listenAndServeTcp(localSvrAddrStr, senderSlice)
+		err, task = listenAndServeTcp(localSvrAddrStr, senderSlice, tempByteSliceLen)
 	case config.UDP_MODE:
-		err, task = serveUdp(localSvrAddrStr, senderSlice)
+		err, task = serveUdp(localSvrAddrStr, senderSlice, tempByteSliceLen)
 	}
 
 	if err != nil {
@@ -149,7 +158,7 @@ func buildLocalSvr(mode string, senderSlice []client.Sender) (error, *model.Task
 	return nil, task
 }
 
-func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender) (error, *model.Task) {
+func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
 	// zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destAddrStrSlice))
 
 	// mode tcp
@@ -173,6 +182,7 @@ func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender) (
 	task.SenderSlice = senderSlice
 	task.LocalServer = tcpListener
 	task.Mode = config.TCP_MODE
+	task.TempByteSliceLen = tempByteSliceLen
 
 	go func() {
 		for {
@@ -185,14 +195,14 @@ func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender) (
 			zaplog.LOGGER.Info("got srcTcpConn " + fmt.Sprint(srcTcpConn))
 
 			// goroutine for single srcTcpConn
-			go processConn(srcTcpConn, senderSlice, task)
+			go processConn(srcTcpConn, task)
 		}
 	}()
 
 	return nil, task
 }
 
-func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender) (error, *model.Task) {
+func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
 	//zaplog.LOGGER.Info("destSvrAddr slice " + fmt.Sprint(destAddrStrSlice))
 
 	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, localUdpSvrAddrStr)
@@ -215,8 +225,9 @@ func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender) (error, *m
 	task.SenderSlice = senderSlice
 	task.LocalServer = udpConn
 	task.Mode = config.UDP_MODE
+	task.TempByteSliceLen = tempByteSliceLen
 
-	go processConn(udpConn, senderSlice, task)
+	go processConn(udpConn, task)
 
 	return nil, task
 
@@ -255,7 +266,7 @@ func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender) (error, *m
 	return nil
 }*/
 
-func processConn(srcConn net.Conn, senderSlice []client.Sender, task *model.Task) {
+func processConn(srcConn net.Conn, task *model.Task) {
 	defer func() {
 		recoveredErr := recover()
 		if recoveredErr != nil {
@@ -271,7 +282,7 @@ func processConn(srcConn net.Conn, senderSlice []client.Sender, task *model.Task
 
 	// loop
 	for {
-		tempByteSlice := make([]byte, *config.TempByteSliceLen, *config.TempByteSliceLen)
+		tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)
 
 		//_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
 		zaplog.LOGGER.Debug("before srcConn.Read(tempByteSlice)")
@@ -314,8 +325,8 @@ func processConn(srcConn net.Conn, senderSlice []client.Sender, task *model.Task
 		waitGroup := &sync.WaitGroup{}
 
 		mutex.Lock()
-		waitGroup.Add(len(senderSlice))
-		for _, sender := range senderSlice {
+		waitGroup.Add(len(task.SenderSlice))
+		for _, sender := range task.SenderSlice {
 			// sender.interrupt() called by current routine,so current routine can immediately know the state
 			if sender == nil {
 				waitGroup.Done()

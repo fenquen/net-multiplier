@@ -31,7 +31,7 @@ var (
 	DefaultMode = flag.String("default_mode", "udp",
 		"tcp or udp,it is used only when you add a task without designating an explicit mode")
 
-	TempByteSliceLen = flag.Int("tempByteSliceLen", 2048,
+	DefaultTempByteSliceLen = flag.Int("defaultTempByteSliceLen", 2048,
 		"the temp byte slice size for tcp/udp read")
 
 	LocalHttpSvrAddr = flag.String("local.http.svr.addr",

@@ -30,9 +30,9 @@ you can dynamically add or remove task via http interface
     	the temp byte slice size for tcp/udp read (default 2048)
 ```
 #### add task
-you should send a http request to the application to add a task
+you should send a http post request to the application to add a task
 ```shell script
-curl http://192.168.99.60/addtask?destAddrStrs=192.168.0.1:6666,192.168.0.2:8888&mode=udp
+curl http://192.168.99.60/addtask -X POST -d 'destAddrsStr=192.168.0.1:6666,192.168.0.2:8888&mode=udp'
 ```
 when the task is successfuly added,the response is like below
 ```json
@@ -49,5 +49,5 @@ when the task is successfuly added,the response is like below
 #### remove task
 when you need remove the task you added before,task id is necessary 
 ```shell script
-curl http://192.168.99.60/delTask?taskId=124e4567e89b12d3a456426655440000
+curl http://192.168.99.60/delTask -X POST -d 'taskId=124e4567e89b12d3a456426655440000'
 ```

@@ -7,11 +7,12 @@ import (
 
 // the model to describe a single task
 type Task struct {
-	Id              string          `json:"id"`
-	LocalSvrAddrStr string          `json:"destAddr"`
-	LocalServer     io.Closer       `json:"-"`
-	SenderSlice     []client.Sender `json:"-"`
-	Mode            string          `json:"mode"`
+	Id               string          `json:"id"`
+	LocalSvrAddrStr  string          `json:"destAddr"`
+	LocalServer      io.Closer       `json:"-"`
+	SenderSlice      []client.Sender `json:"-"`
+	Mode             string          `json:"-"`
+	TempByteSliceLen int             `json:"-"`
 }
 
 func (task *Task) Close() error {
