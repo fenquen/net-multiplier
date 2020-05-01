@@ -42,27 +42,18 @@ func ServeHttp() {
 	http.HandleFunc("/multiplier/addTask", func(writer http.ResponseWriter, request *http.Request) {
 		defer handlePanic(writer)
 
-		destAddrStrSlice := request.FormValue("destAddrStrs")
+		destAddrsStr := request.FormValue("destAddrsStr")
 		mode := request.FormValue("mode")
 
 		mutex.Lock()
 
 		// build senders
-		senderSlice := make([]client.Sender, 6)
-		for _, destAddrStr := range strings.Split(destAddrStrSlice, config.DELIMITER) {
-
-			sender, err := client.NewSender(destAddrStr, mode)
-
-			// fail to build sender,due to net err
-			if nil != err {
-				zaplog.LOGGER.Error("build sender error whose dest is "+destAddrStr, zap.Any("err", err))
-				continue
+		senderSlice, err := buildSenders(destAddrsStr, mode)
+		if err != nil {
+			for _, sender := range senderSlice {
+				sender.Interrupt()
 			}
-
-			senderSlice = append(senderSlice, sender)
-			//destAddr_sender[destAddrStr] = sender
-
-			sender.Start()
+			panic(err)
 		}
 
 		// build listener
@@ -102,6 +93,29 @@ func ServeHttp() {
 		zaplog.LOGGER.Info("http.ListenAndServe err")
 		panic(err)
 	}
+}
+
+func buildSenders(destAddrsStr, mode string) ([]client.Sender, error) {
+	destAddrStrSlice := strings.Split(destAddrsStr, config.DELIMITER)
+	senderSlice := make([]client.Sender, len(destAddrStrSlice))
+
+	for _, destAddrStr := range destAddrStrSlice {
+
+		sender, err := client.NewSender(destAddrStr, mode)
+
+		// fail to build sender,due to net err
+		if nil != err {
+			zaplog.LOGGER.Error("build sender error whose dest is "+destAddrStr, zap.Any("err", err))
+			continue
+		}
+
+		senderSlice = append(senderSlice, sender)
+		//destAddr_sender[destAddrStr] = sender
+
+		sender.Start()
+	}
+
+	return senderSlice, nil
 }
 
 func buildLocalSvr(mode string, senderSlice []client.Sender) (error, *model.Task) {
