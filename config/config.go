@@ -28,7 +28,8 @@ var (
 
 	LogLevel = flag.String("log.level", "info", "")
 
-	DefaultMode = flag.String("default_mode", "udp", "tcp or udp")
+	DefaultMode = flag.String("default_mode", "udp",
+		"tcp or udp,it is used only when you add a task without designating an explicit mode")
 
 	TempByteSliceLen = flag.Int("tempByteSliceLen", 2048,
 		"the temp byte slice size for tcp/udp read")
