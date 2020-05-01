@@ -46,6 +46,8 @@ func ServeHttp() {
 		mode := request.FormValue("mode")
 
 		mutex.Lock()
+
+		// build senders
 		senderSlice := make([]client.Sender, 6)
 		for _, destAddrStr := range strings.Split(destAddrStrSlice, config.DELIMITER) {
 
@@ -63,6 +65,7 @@ func ServeHttp() {
 			sender.Start()
 		}
 
+		// build listener
 		err, task := buildLocalSvr(mode, senderSlice)
 		if err != nil {
 			for _, sender := range senderSlice {
@@ -302,6 +305,7 @@ func processConn(srcConn net.Conn, senderSlice []client.Sender, task *model.Task
 
 			select {
 			case <-sender.GetReportUnavailableChan():
+				// close the stcDataChan at the write side
 				sender.Close()
 				sender = nil
 				waitGroup.Done()

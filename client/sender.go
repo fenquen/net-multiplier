@@ -17,13 +17,14 @@ type Sender interface {
 	Close()
 	Interrupted() bool
 
-	GetSrcDataChan() chan []byte
+	GetSrcDataChan() chan<- []byte
+	SetSrcDataChan(srcDataChan chan []byte)
 
 	SetConn2DestSvr(conn2DestSvr net.Conn)
-	SetSrcDataChan(srcDataChan chan []byte)
 	SetSwitcher(switcher chan bool)
 
-	GetReportUnavailableChan() chan bool
+	GetReportUnavailableChan() <-chan bool
+	SetReportUnavailableChan(unavailableChan chan bool)
 
 	SetMode(mode string)
 	GetMode() string
@@ -97,6 +98,7 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 	result.SetConn2DestSvr(conn2DestSvr)
 	result.SetSrcDataChan(make(chan []byte, 100))
 	result.SetSwitcher(make(chan bool, 1))
+	result.SetReportUnavailableChan(make(chan bool))
 
 	return result, nil
 

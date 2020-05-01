@@ -86,8 +86,12 @@ func (senderBase *SenderBase) reportUnavailable() {
 	close(senderBase.reportUnavailableChan)
 }
 
-func (senderBase *SenderBase) GetReportUnavailableChan() chan bool {
+func (senderBase *SenderBase) GetReportUnavailableChan() <-chan bool {
 	return senderBase.reportUnavailableChan
+}
+
+func (senderBase *SenderBase) SetReportUnavailableChan(unavailableChan chan bool) {
+	senderBase.reportUnavailableChan = unavailableChan
 }
 
 // used by other element
@@ -97,7 +101,7 @@ func (senderBase *SenderBase) Interrupt() {
 	close(senderBase.switcher)
 }
 
-// should be triggered by other
+// should be triggered by the write side
 func (senderBase *SenderBase) Close() {
 	close(senderBase.srcDataChan)
 }
@@ -106,7 +110,7 @@ func (senderBase *SenderBase) Interrupted() bool {
 	return senderBase.interrupted
 }
 
-func (senderBase *SenderBase) GetSrcDataChan() chan []byte {
+func (senderBase *SenderBase) GetSrcDataChan() chan<- []byte {
 	return senderBase.srcDataChan
 }
 
