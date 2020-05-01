@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	_ "errors"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
@@ -113,6 +114,10 @@ func buildSenders(destAddrsStr, mode string) ([]client.Sender, error) {
 		//destAddr_sender[destAddrStr] = sender
 
 		sender.Start()
+	}
+
+	if len(senderSlice) == 0 {
+		return nil, errors.New("haven't successfully build a sender")
 	}
 
 	return senderSlice, nil
