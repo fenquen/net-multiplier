@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 var mutex sync.Mutex
@@ -255,7 +256,7 @@ func processConn(srcConn net.Conn, task *client.Task) {
 
 		//tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)
 
-		//_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
+		_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
 		zaplog.LOGGER.Debug("before srcConn.Read(tempByteSlice)")
 		readCount, err := srcConn.Read(dataWrapper.DataBuf)
 		zaplog.LOGGER.Debug("readCount, err := srcConn.Read(tempByteSlice)",
@@ -264,6 +265,12 @@ func processConn(srcConn net.Conn, task *client.Task) {
 		if 0 >= readCount && err != nil /*io.EOF*/ {
 			zaplog.LOGGER.Error("srcConn.Read(tempByteSlice), 0 >= readCount && err != nil",
 				zap.Any("err", err))
+
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() || netErr.Temporary() {
+					continue
+				}
+			}
 
 			// meanings srcTcpConn is closed by client
 			if task.Mode == config.TCP_MODE {
