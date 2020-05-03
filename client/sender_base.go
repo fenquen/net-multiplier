@@ -5,14 +5,13 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"net-multiplier/config"
-	"net-multiplier/model"
 	"net-multiplier/zaplog"
 	"time"
 )
 
 type SenderBase struct {
 	conn2DestSvr     net.Conn
-	srcDataChan      chan *model.DataBufWrapper
+	srcDataChan      chan *DataBufWrapper
 	cancelSignalChan chan bool
 	interrupted      bool
 	localAddr        net.Addr
@@ -113,7 +112,7 @@ func (senderBase *SenderBase) Interrupted() bool {
 	return senderBase.interrupted
 }
 
-func (senderBase *SenderBase) GetSrcDataChan() chan<- *model.DataBufWrapper {
+func (senderBase *SenderBase) GetSrcDataChan() chan<- *DataBufWrapper {
 	return senderBase.srcDataChan
 }
 
@@ -121,7 +120,7 @@ func (senderBase *SenderBase) SetConn2DestSvr(conn2DestSvr net.Conn) {
 	senderBase.conn2DestSvr = conn2DestSvr
 }
 
-func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan *model.DataBufWrapper) {
+func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan *DataBufWrapper) {
 	senderBase.srcDataChan = srcDataChan
 }
 func (senderBase *SenderBase) SetSwitcher(switcher chan bool) {

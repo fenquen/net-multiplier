@@ -6,7 +6,9 @@ import (
 	"errors"
 	_ "errors"
 	"fmt"
+	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
+	"io"
 	"net"
 	"net-multiplier/client"
 	"net-multiplier/config"
@@ -20,7 +22,7 @@ import (
 )
 
 var mutex sync.Mutex
-var uuid_task = make(map[string]*model.Task)
+var uuid_task = make(map[string]*client.Task)
 
 func ServeHttp() {
 	handlePanic := func(writer http.ResponseWriter) {
@@ -128,7 +130,7 @@ func buildSenders(destAddrsStr, mode string) ([]client.Sender, error) {
 	return senderSlice, nil
 }
 
-func buildLocalSvr(mode string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
+func buildLocalSvr(mode string, senderSlice []client.Sender, tempByteSliceLen int) (error, *client.Task) {
 	// use default mode configured in config
 	if mode == "" {
 		mode = *config.DefaultMode
@@ -138,7 +140,7 @@ func buildLocalSvr(mode string, senderSlice []client.Sender, tempByteSliceLen in
 	localSvrAddrStr := *config.LocalSvrHostStr + ":" + strconv.Itoa(int(localClientPort))
 
 	var err error
-	var task *model.Task
+	var task *client.Task
 
 	switch mode {
 	case config.TCP_MODE:
@@ -154,7 +156,7 @@ func buildLocalSvr(mode string, senderSlice []client.Sender, tempByteSliceLen in
 	return nil, task
 }
 
-func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
+func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *client.Task) {
 	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_MODE, localTcpSvrAddrStr)
 	if nil != err {
 		zaplog.LOGGER.Info("localTcpSvrAddr err")
@@ -168,7 +170,7 @@ func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, t
 	}
 
 	// build task
-	task := model.BuildTask(localTcpSvrAddrStr, senderSlice, tcpListener, tempByteSliceLen, config.TCP_MODE)
+	task := BuildTask(localTcpSvrAddrStr, senderSlice, tcpListener, tempByteSliceLen, config.TCP_MODE)
 
 	go func() {
 		for {
@@ -188,7 +190,7 @@ func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, t
 	return nil, task
 }
 
-func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
+func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *client.Task) {
 	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, localUdpSvrAddrStr)
 	if nil != err {
 		zaplog.LOGGER.Info("localUdpSvrAddr err")
@@ -202,14 +204,27 @@ func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSl
 	}
 
 	// build task
-	task := model.BuildTask(localUdpSvrAddrStr, senderSlice, udpConn, tempByteSliceLen, config.UDP_MODE)
+	task := BuildTask(localUdpSvrAddrStr, senderSlice, udpConn, tempByteSliceLen, config.UDP_MODE)
 
 	go processConn(udpConn, task)
 
 	return nil, task
 }
 
-func processConn(srcConn net.Conn, task *model.Task) {
+func BuildTask(localTcpSvrAddrStr string, senderSlice []client.Sender, localServer io.Closer, tempByteSliceLen int, mode string) *client.Task {
+	task := &client.Task{}
+	task.Id = uuid.NewV1().String()
+	task.LocalSvrAddrStr = localTcpSvrAddrStr
+	task.SenderSlice = senderSlice
+	task.LocalServer = localServer
+	task.Mode = mode
+	task.TempByteSliceLen = tempByteSliceLen
+	task.DataBufWrapperChan = make(chan *client.DataBufWrapper, 1024)
+	task.CancelSignalChan = make(chan bool, 1)
+	return task
+}
+
+func processConn(srcConn net.Conn, task *client.Task) {
 	defer func() {
 		recoveredErr := recover()
 		if recoveredErr != nil {
@@ -228,14 +243,14 @@ func processConn(srcConn net.Conn, task *model.Task) {
 		default:
 		}
 
-		var dataWrapper *model.DataBufWrapper
+		var dataWrapper *client.DataBufWrapper
 
 		// try to reuse dataWrapper
 		select {
 		case d := <-task.DataBufWrapperChan:
 			dataWrapper = d
 		default:
-			dataWrapper = model.BuildDataBufWrapper(task.TempByteSliceLen, int32(len(task.SenderSlice)))
+			dataWrapper = client.BuildDataBufWrapper(task.TempByteSliceLen, int32(len(task.SenderSlice)))
 		}
 
 		//tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)

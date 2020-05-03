@@ -4,7 +4,6 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"net-multiplier/config"
-	"net-multiplier/model"
 	"net-multiplier/utils"
 	"net-multiplier/zaplog"
 	"strconv"
@@ -18,8 +17,8 @@ type Sender interface {
 	Close()
 	Interrupted() bool
 
-	GetSrcDataChan() chan<- *model.DataBufWrapper
-	SetSrcDataChan(srcDataChan chan *model.DataBufWrapper)
+	GetSrcDataChan() chan<- *DataBufWrapper
+	SetSrcDataChan(srcDataChan chan *DataBufWrapper)
 
 	SetConn2DestSvr(conn2DestSvr net.Conn)
 	SetSwitcher(switcher chan bool)
@@ -97,7 +96,7 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 	}
 
 	result.SetConn2DestSvr(conn2DestSvr)
-	result.SetSrcDataChan(make(chan *model.DataBufWrapper, 100))
+	result.SetSrcDataChan(make(chan *DataBufWrapper, 100))
 	result.SetSwitcher(make(chan bool, 1))
 	result.SetReportUnavailableChan(make(chan bool))
 
