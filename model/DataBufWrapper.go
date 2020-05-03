@@ -12,7 +12,7 @@ type DataBufWrapper struct {
 	BelongingTask *Task
 }
 
-func NewDataBufWrapper(tempSize int, num int32) *DataBufWrapper {
+func BuildDataBufWrapper(tempSize int, num int32) *DataBufWrapper {
 	dataWrapper := &DataBufWrapper{}
 
 	dataWrapper.num = num

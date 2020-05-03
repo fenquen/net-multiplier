@@ -6,7 +6,6 @@ import (
 	"errors"
 	_ "errors"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
 	"net"
 	"net-multiplier/client"
@@ -24,7 +23,6 @@ var mutex sync.Mutex
 var uuid_task = make(map[string]*model.Task)
 
 func ServeHttp() {
-
 	handlePanic := func(writer http.ResponseWriter) {
 		recoverErr := recover()
 		if recoverErr == nil {
@@ -157,9 +155,6 @@ func buildLocalSvr(mode string, senderSlice []client.Sender, tempByteSliceLen in
 }
 
 func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
-	// zaplog.LOGGER.Info("destSvrAddr " + fmt.Sprint(destAddrStrSlice))
-
-	// mode tcp
 	localTcpSvrAddr, err := net.ResolveTCPAddr(config.TCP_MODE, localTcpSvrAddrStr)
 	if nil != err {
 		zaplog.LOGGER.Info("localTcpSvrAddr err")
@@ -173,16 +168,7 @@ func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, t
 	}
 
 	// build task
-	uuidStr := uuid.NewV1().String()
-	task := &model.Task{}
-	task.Id = uuidStr
-	task.LocalSvrAddrStr = localTcpSvrAddrStr
-	task.SenderSlice = senderSlice
-	task.LocalServer = tcpListener
-	task.Mode = config.TCP_MODE
-	task.TempByteSliceLen = tempByteSliceLen
-	task.DataBufWrapperChan = make(chan *model.DataBufWrapper, 1024)
-	task.CancelSignalChan = make(chan bool, 1)
+	task := model.BuildTask(localTcpSvrAddrStr, senderSlice, tcpListener, tempByteSliceLen, config.TCP_MODE)
 
 	go func() {
 		for {
@@ -203,8 +189,6 @@ func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, t
 }
 
 func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSliceLen int) (error, *model.Task) {
-	//zaplog.LOGGER.Info("destSvrAddr slice " + fmt.Sprint(destAddrStrSlice))
-
 	localUdpSvrAddr, err := net.ResolveUDPAddr(config.UDP_MODE, localUdpSvrAddrStr)
 	if nil != err {
 		zaplog.LOGGER.Info("localUdpSvrAddr err")
@@ -218,21 +202,11 @@ func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSl
 	}
 
 	// build task
-	uuidStr := uuid.NewV1().String()
-	task := &model.Task{}
-	task.Id = uuidStr
-	task.LocalSvrAddrStr = localUdpSvrAddrStr
-	task.SenderSlice = senderSlice
-	task.LocalServer = udpConn
-	task.Mode = config.UDP_MODE
-	task.TempByteSliceLen = tempByteSliceLen
-	task.DataBufWrapperChan = make(chan *model.DataBufWrapper, 1024)
-	task.CancelSignalChan = make(chan bool, 1)
+	task := model.BuildTask(localUdpSvrAddrStr, senderSlice, udpConn, tempByteSliceLen, config.UDP_MODE)
 
 	go processConn(udpConn, task)
 
 	return nil, task
-
 }
 
 func processConn(srcConn net.Conn, task *model.Task) {
@@ -261,7 +235,7 @@ func processConn(srcConn net.Conn, task *model.Task) {
 		case d := <-task.DataBufWrapperChan:
 			dataWrapper = d
 		default:
-			dataWrapper = model.NewDataBufWrapper(task.TempByteSliceLen, int32(len(task.SenderSlice)))
+			dataWrapper = model.BuildDataBufWrapper(task.TempByteSliceLen, int32(len(task.SenderSlice)))
 		}
 
 		//tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)
