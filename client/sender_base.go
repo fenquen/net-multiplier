@@ -11,12 +11,12 @@ import (
 )
 
 type SenderBase struct {
-	conn2DestSvr net.Conn
-	srcDataChan  chan *model.DataWrapper
-	switcher     chan bool
-	interrupted  bool
-	localAddr    net.Addr
-	remoteAddr   net.Addr
+	conn2DestSvr     net.Conn
+	srcDataChan      chan *model.DataBufWrapper
+	cancelSignalChan chan bool
+	interrupted      bool
+	localAddr        net.Addr
+	remoteAddr       net.Addr
 
 	reportUnavailableChan chan bool
 	available             bool
@@ -44,10 +44,10 @@ func (senderBase *SenderBase) Run() {
 	}()
 
 	for {
-		// whether need to be interrupted
+		// whether need to be canceled
 		select {
-		// interrupted
-		case v := <-senderBase.switcher:
+		// canceled
+		case v := <-senderBase.cancelSignalChan:
 			if v {
 				return
 			}
@@ -63,18 +63,18 @@ func (senderBase *SenderBase) Run() {
 			var err error
 			switch senderBase.mode {
 			case config.TCP_MODE:
-				_, err = senderBase.conn2DestSvr.Write(dataWrapper.Data)
+				_, err = senderBase.conn2DestSvr.Write(dataWrapper.DataBuf)
 			case config.UDP_MODE:
 				udpConn, _ := senderBase.conn2DestSvr.(*net.UDPConn)
 				udpAddr, _ := senderBase.remoteAddr.(*net.UDPAddr)
-				_, err = udpConn.WriteToUDP(dataWrapper.Data, udpAddr)
+				_, err = udpConn.WriteToUDP(dataWrapper.DataBuf, udpAddr)
 			}
 
 			if nil != err {
 				panic(err)
 			}
 
-			zaplog.LOGGER.Debug("successfully write data to dest "+hex.EncodeToString(dataWrapper.Data),
+			zaplog.LOGGER.Debug("successfully write data to dest "+hex.EncodeToString(dataWrapper.DataBuf),
 				zap.Any("localAddr", "senderBase.localAddr"), zap.Any("remoteAddr", senderBase.remoteAddr))
 
 			dataWrapper.PutBack()
@@ -98,10 +98,10 @@ func (senderBase *SenderBase) SetReportUnavailableChan(unavailableChan chan bool
 }
 
 // used by other element
-func (senderBase *SenderBase) Interrupt() {
-	senderBase.switcher <- true
+func (senderBase *SenderBase) Cancel() {
+	senderBase.cancelSignalChan <- true
 	senderBase.interrupted = true
-	close(senderBase.switcher)
+	close(senderBase.cancelSignalChan)
 }
 
 // should be triggered by the write side
@@ -113,7 +113,7 @@ func (senderBase *SenderBase) Interrupted() bool {
 	return senderBase.interrupted
 }
 
-func (senderBase *SenderBase) GetSrcDataChan() chan<- *model.DataWrapper {
+func (senderBase *SenderBase) GetSrcDataChan() chan<- *model.DataBufWrapper {
 	return senderBase.srcDataChan
 }
 
@@ -121,11 +121,11 @@ func (senderBase *SenderBase) SetConn2DestSvr(conn2DestSvr net.Conn) {
 	senderBase.conn2DestSvr = conn2DestSvr
 }
 
-func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan *model.DataWrapper) {
+func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan *model.DataBufWrapper) {
 	senderBase.srcDataChan = srcDataChan
 }
 func (senderBase *SenderBase) SetSwitcher(switcher chan bool) {
-	senderBase.switcher = switcher
+	senderBase.cancelSignalChan = switcher
 }
 
 func (senderBase *SenderBase) SetMode(mode string) {

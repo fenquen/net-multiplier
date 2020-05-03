@@ -20,11 +20,8 @@ import (
 	"sync"
 )
 
-//var destAddrStrSlice = strings.Split(*config.DestSvrAddrs, config.DELIMITER)
-//var destAddr_sender = make(map[string]client.Sender, 8)
 var mutex sync.Mutex
 var uuid_task = make(map[string]*model.Task)
-var DataWrapperChan = make(chan *model.DataWrapper, 1024)
 
 func ServeHttp() {
 
@@ -62,7 +59,7 @@ func ServeHttp() {
 		senderSlice, err := buildSenders(destAddrsStr, mode)
 		if err != nil {
 			for _, sender := range senderSlice {
-				sender.Interrupt()
+				sender.Cancel()
 			}
 			panic(err)
 		}
@@ -71,7 +68,7 @@ func ServeHttp() {
 		err, task := buildLocalSvr(mode, senderSlice, tempByteSliceLen)
 		if err != nil {
 			for _, sender := range senderSlice {
-				sender.Interrupt()
+				sender.Cancel()
 			}
 			panic(err)
 		}
@@ -93,7 +90,7 @@ func ServeHttp() {
 		task := uuid_task[taskId]
 		if nil != task {
 			delete(uuid_task, taskId)
-			_ = task.Close()
+			task.Cancel()
 		}
 		mutex.Unlock()
 
@@ -184,6 +181,8 @@ func listenAndServeTcp(localTcpSvrAddrStr string, senderSlice []client.Sender, t
 	task.LocalServer = tcpListener
 	task.Mode = config.TCP_MODE
 	task.TempByteSliceLen = tempByteSliceLen
+	task.DataBufWrapperChan = make(chan *model.DataBufWrapper, 1024)
+	task.CancelSignalChan = make(chan bool, 1)
 
 	go func() {
 		for {
@@ -227,6 +226,8 @@ func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSl
 	task.LocalServer = udpConn
 	task.Mode = config.UDP_MODE
 	task.TempByteSliceLen = tempByteSliceLen
+	task.DataBufWrapperChan = make(chan *model.DataBufWrapper, 1024)
+	task.CancelSignalChan = make(chan bool, 1)
 
 	go processConn(udpConn, task)
 
@@ -234,70 +235,40 @@ func serveUdp(localUdpSvrAddrStr string, senderSlice []client.Sender, tempByteSl
 
 }
 
-// warm up in advance
-/*func buildAndBootSenderSlice() error {
-	// senderSlice
-
-	// actually empty dest slice
-	if nil == destAddrStrSlice || len(destAddrStrSlice) == 0 {
-		return errors.New("nil == destAddrStrSlice || len(destAddrStrSlice) == 0")
-	}
-
-	// := len(destAddrStrSlice)
-	//senderSlice := make([]client.Sender, 0, destSvrNum)
-
-	for _, destAddrStr := range destAddrStrSlice {
-		sender, err := client.NewSender(destAddrStr, *config.DefaultMode)
-
-		// fail to build sender,due to net err
-		if nil != err {
-			zaplog.LOGGER.Error("build sender error whose dest is "+destAddrStr, zap.Any("err", err))
-			continue
-		}
-
-		destAddr_sender[destAddrStr] = sender
-		//senderSlice = append(senderSlice, sender)
-		sender.Start()
-	}
-
-	if len(destAddr_sender) == 0 {
-		return errors.New("build senders totally failed ")
-	}
-
-	return nil
-}*/
-
 func processConn(srcConn net.Conn, task *model.Task) {
 	defer func() {
 		recoveredErr := recover()
 		if recoveredErr != nil {
 			zaplog.LOGGER.Error("processConn panic ", zap.Any("err", recoveredErr))
 		}
-		_ = srcConn.Close()
+		_ = task.Close()
 	}()
-
-	/*err := buildAndBootSenderSlice()
-	if nil != err {
-		panic(err)
-	}*/
 
 	// loop
 	for {
-		var dataWrapper *model.DataWrapper
+		// always make sure the task is valid first
+		select {
+		// means the task is not valid
+		case <-task.CancelSignalChan:
+			return
+		default:
+		}
+
+		var dataWrapper *model.DataBufWrapper
 
 		// try to reuse dataWrapper
 		select {
-		case d := <-DataWrapperChan:
+		case d := <-task.DataBufWrapperChan:
 			dataWrapper = d
 		default:
-			dataWrapper = model.NewDataWrapper(task.TempByteSliceLen, int32(len(task.SenderSlice)))
+			dataWrapper = model.NewDataBufWrapper(task.TempByteSliceLen, int32(len(task.SenderSlice)))
 		}
 
 		//tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)
 
 		//_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
 		zaplog.LOGGER.Debug("before srcConn.Read(tempByteSlice)")
-		readCount, err := srcConn.Read(dataWrapper.Data)
+		readCount, err := srcConn.Read(dataWrapper.DataBuf)
 		zaplog.LOGGER.Debug("readCount, err := srcConn.Read(tempByteSlice)",
 			zap.Any("readCount", readCount), zap.Any("err", err))
 
@@ -310,27 +281,19 @@ func processConn(srcConn net.Conn, task *model.Task) {
 				// interrupt all sender serving this srcTcpConn
 				/*	for _, sender := range senderSlice {
 					if nil != sender {
-						sender.Interrupt()
+						sender.Cancel()
 						sender.Close()
 					}
 				}*/
-
-				_ = task.Close()
 			}
 
 			return
 		}
 
-		dataWrapper.Data = dataWrapper.Data[0:readCount]
+		dataWrapper.DataBuf = dataWrapper.DataBuf[0:readCount]
 
 		//zaplog.LOGGER.Info("receive src data from " + srcConn.RemoteAddr().String())
-		zaplog.LOGGER.Debug("data received " + hex.EncodeToString(dataWrapper.Data))
-
-		// per dest/sender a goroutine
-		/*go func(senderSlice []client.Sender, tempByteSlice [] byte) {
-		if nil == senderSlice {
-			return
-		}*/
+		zaplog.LOGGER.Debug("data received " + hex.EncodeToString(dataWrapper.DataBuf))
 
 		// need to dispatch data to each sender's data channel
 		waitGroup := &sync.WaitGroup{}
@@ -338,12 +301,19 @@ func processConn(srcConn net.Conn, task *model.Task) {
 		mutex.Lock()
 		waitGroup.Add(len(task.SenderSlice))
 		for _, sender := range task.SenderSlice {
+			if sender == nil {
+				dataWrapper.PutBack()
+				waitGroup.Done()
+				continue
+			}
+
 			select {
 			case <-sender.GetReportUnavailableChan():
 				// close the stcDataChan at the write side
 				sender.Close()
 				sender = nil
 				waitGroup.Done()
+				dataWrapper.PutBack()
 				continue
 			default:
 			}

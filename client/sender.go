@@ -14,12 +14,12 @@ type Sender interface {
 	Start()
 	Run()
 
-	Interrupt()
+	Cancel()
 	Close()
 	Interrupted() bool
 
-	GetSrcDataChan() chan<- *model.DataWrapper
-	SetSrcDataChan(srcDataChan chan *model.DataWrapper)
+	GetSrcDataChan() chan<- *model.DataBufWrapper
+	SetSrcDataChan(srcDataChan chan *model.DataBufWrapper)
 
 	SetConn2DestSvr(conn2DestSvr net.Conn)
 	SetSwitcher(switcher chan bool)
@@ -97,7 +97,7 @@ func NewSender(destTcpSvrAddrStr string, mode string) (Sender, error) {
 	}
 
 	result.SetConn2DestSvr(conn2DestSvr)
-	result.SetSrcDataChan(make(chan *model.DataWrapper, 100))
+	result.SetSrcDataChan(make(chan *model.DataBufWrapper, 100))
 	result.SetSwitcher(make(chan bool, 1))
 	result.SetReportUnavailableChan(make(chan bool))
 
