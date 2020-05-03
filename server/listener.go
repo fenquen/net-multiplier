@@ -284,11 +284,13 @@ func processConn(srcConn net.Conn, task *model.Task) {
 	// loop
 	for {
 		var dataWrapper *model.DataWrapper
+
+		// try to reuse dataWrapper
 		select {
 		case d := <-DataWrapperChan:
 			dataWrapper = d
 		default:
-			dataWrapper = model.NewDataWrapper(task.TempByteSliceLen, 0)
+			dataWrapper = model.NewDataWrapper(task.TempByteSliceLen, int32(len(task.SenderSlice)))
 		}
 
 		//tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)
@@ -336,12 +338,6 @@ func processConn(srcConn net.Conn, task *model.Task) {
 		mutex.Lock()
 		waitGroup.Add(len(task.SenderSlice))
 		for _, sender := range task.SenderSlice {
-			// sender.interrupt() called by current routine,so current routine can immediately know the state
-			if sender == nil {
-				waitGroup.Done()
-				continue
-			}
-
 			select {
 			case <-sender.GetReportUnavailableChan():
 				// close the stcDataChan at the write side
