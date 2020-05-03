@@ -24,6 +24,7 @@ import (
 //var destAddr_sender = make(map[string]client.Sender, 8)
 var mutex sync.Mutex
 var uuid_task = make(map[string]*model.Task)
+var DataWrapperChan = make(chan *model.DataWrapper, 1024)
 
 func ServeHttp() {
 
@@ -282,11 +283,19 @@ func processConn(srcConn net.Conn, task *model.Task) {
 
 	// loop
 	for {
-		tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)
+		var dataWrapper *model.DataWrapper
+		select {
+		case d := <-DataWrapperChan:
+			dataWrapper = d
+		default:
+			dataWrapper = model.NewDataWrapper(task.TempByteSliceLen, 0)
+		}
+
+		//tempByteSlice := make([]byte, task.TempByteSliceLen, task.TempByteSliceLen)
 
 		//_ = srcConn.SetReadDeadline(time.Now().Add(time.Second * 10))
 		zaplog.LOGGER.Debug("before srcConn.Read(tempByteSlice)")
-		readCount, err := srcConn.Read(tempByteSlice)
+		readCount, err := srcConn.Read(dataWrapper.Data)
 		zaplog.LOGGER.Debug("readCount, err := srcConn.Read(tempByteSlice)",
 			zap.Any("readCount", readCount), zap.Any("err", err))
 
@@ -310,10 +319,10 @@ func processConn(srcConn net.Conn, task *model.Task) {
 			return
 		}
 
-		tempByteSlice = tempByteSlice[0:readCount]
+		dataWrapper.Data = dataWrapper.Data[0:readCount]
 
 		//zaplog.LOGGER.Info("receive src data from " + srcConn.RemoteAddr().String())
-		zaplog.LOGGER.Debug("data received " + hex.EncodeToString(tempByteSlice))
+		zaplog.LOGGER.Debug("data received " + hex.EncodeToString(dataWrapper.Data))
 
 		// per dest/sender a goroutine
 		/*go func(senderSlice []client.Sender, tempByteSlice [] byte) {
@@ -344,7 +353,7 @@ func processConn(srcConn net.Conn, task *model.Task) {
 			}
 
 			go func(sender client.Sender) {
-				sender.GetSrcDataChan() <- tempByteSlice
+				sender.GetSrcDataChan() <- dataWrapper
 				waitGroup.Done()
 			}(sender)
 		}

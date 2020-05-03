@@ -5,13 +5,14 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"net-multiplier/config"
+	"net-multiplier/model"
 	"net-multiplier/zaplog"
 	"time"
 )
 
 type SenderBase struct {
 	conn2DestSvr net.Conn
-	srcDataChan  chan []byte
+	srcDataChan  chan *model.DataWrapper
 	switcher     chan bool
 	interrupted  bool
 	localAddr    net.Addr
@@ -54,7 +55,7 @@ func (senderBase *SenderBase) Run() {
 		}
 
 		select {
-		case byteSlice, allRight := <-senderBase.srcDataChan:
+		case dataWrapper, allRight := <-senderBase.srcDataChan:
 			// means the chan is closed
 			if !allRight {
 				return
@@ -62,19 +63,21 @@ func (senderBase *SenderBase) Run() {
 			var err error
 			switch senderBase.mode {
 			case config.TCP_MODE:
-				_, err = senderBase.conn2DestSvr.Write(byteSlice)
+				_, err = senderBase.conn2DestSvr.Write(dataWrapper.Data)
 			case config.UDP_MODE:
 				udpConn, _ := senderBase.conn2DestSvr.(*net.UDPConn)
 				udpAddr, _ := senderBase.remoteAddr.(*net.UDPAddr)
-				_, err = udpConn.WriteToUDP(byteSlice, udpAddr)
+				_, err = udpConn.WriteToUDP(dataWrapper.Data, udpAddr)
 			}
 
 			if nil != err {
 				panic(err)
 			}
 
-			zaplog.LOGGER.Debug("successfully write data to dest "+hex.EncodeToString(byteSlice),
+			zaplog.LOGGER.Debug("successfully write data to dest "+hex.EncodeToString(dataWrapper.Data),
 				zap.Any("localAddr", "senderBase.localAddr"), zap.Any("remoteAddr", senderBase.remoteAddr))
+
+			dataWrapper.PutBack()
 		case <-time.After(time.Millisecond):
 		}
 	}
@@ -110,7 +113,7 @@ func (senderBase *SenderBase) Interrupted() bool {
 	return senderBase.interrupted
 }
 
-func (senderBase *SenderBase) GetSrcDataChan() chan<- []byte {
+func (senderBase *SenderBase) GetSrcDataChan() chan<- *model.DataWrapper {
 	return senderBase.srcDataChan
 }
 
@@ -118,7 +121,7 @@ func (senderBase *SenderBase) SetConn2DestSvr(conn2DestSvr net.Conn) {
 	senderBase.conn2DestSvr = conn2DestSvr
 }
 
-func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan []byte) {
+func (senderBase *SenderBase) SetSrcDataChan(srcDataChan chan *model.DataWrapper) {
 	senderBase.srcDataChan = srcDataChan
 }
 func (senderBase *SenderBase) SetSwitcher(switcher chan bool) {
